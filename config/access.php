@@ -179,6 +179,36 @@ return [
             ],
         ],
 
+                'master_fleet' => [
+            'label' => 'Master Fleet',
+
+            'permissions' => [
+                'master-fleet.view' =>
+                    'Melihat Modul Master Fleet',
+
+                'fleet-terminal.create' =>
+                    'Menambah TLPG atau Terminal',
+
+                'fleet-terminal.update' =>
+                    'Mengubah TLPG atau Terminal',
+
+                'fleet-terminal.disable' =>
+                    'Mengaktifkan atau Menonaktifkan TLPG',
+
+                'fleet-company.create' =>
+                    'Menambah SPBE atau Perusahaan',
+
+                'fleet-company.update' =>
+                    'Mengubah SPBE atau Perusahaan',
+
+                'fleet-company.disable' =>
+                    'Mengaktifkan atau Menonaktifkan SPBE',
+
+                'fleet-distance.update' =>
+                    'Mengubah Jarak SPBE ke TLPG',
+            ],
+        ],
+
         'synchronization' => [
             'label' => 'Sinkronisasi Data',
 

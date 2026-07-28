@@ -14,6 +14,8 @@
         $homeUrl = route('k32.index');
     } elseif ($currentUser->can('laporan-k32.view')) {
         $homeUrl = route('k32-report.index');
+    } elseif (config('master-fleet.enabled') && $currentUser->can('master-fleet.view')) {
+        $homeUrl =route('master-fleet.index');
     } elseif ($currentUser->can('users.access')) {
         $homeUrl = route('developer.users.index');
     } else {
@@ -86,6 +88,22 @@
                             Laporan K3.2
                         </x-nav-link>
                     @endcan
+
+                    @if( config('master-fleet.enabled')
+                    )
+                        @can('master-fleet.view')
+                            <x-nav-link
+                                :href="route(
+                                    'master-fleet.index'
+                                )"
+                                :active="request()->routeIs(
+                                    'master-fleet.*'
+                                )"
+                            >
+                                Master Fleet
+                            </x-nav-link>
+                        @endcan
+                    @endif
                 </div>
             </div>
 
@@ -263,6 +281,25 @@
                     Laporan K3.2
                 </x-responsive-nav-link>
             @endcan
+
+                        @if(
+                config(
+                    'master-fleet.enabled'
+                )
+            )
+                @can('master-fleet.view')
+                    <x-responsive-nav-link
+                        :href="route(
+                            'master-fleet.index'
+                        )"
+                        :active="request()->routeIs(
+                            'master-fleet.*'
+                        )"
+                    >
+                        Master Fleet
+                    </x-responsive-nav-link>
+                @endcan
+            @endif
 
             @can('users.access')
                 <x-responsive-nav-link

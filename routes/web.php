@@ -10,6 +10,9 @@ use App\Http\Controllers\PelanggaranController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\UploadTerpaduController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\MasterFleet\FleetCompanyController;
+use App\Http\Controllers\MasterFleet\FleetTerminalController;
+use App\Http\Controllers\MasterFleet\MasterFleetController;
 
 /*
 |--------------------------------------------------------------------------
@@ -461,5 +464,184 @@ Route::middleware([
             ]
         )->name('users.toggle-active');
     });
+
+        /*
+    |--------------------------------------------------------------------------
+    | Master Fleet Development
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        config(
+            'master-fleet.enabled'
+        )
+    ) {
+        Route::prefix('master-fleet')
+            ->name('master-fleet.')
+            ->middleware(
+                'can:master-fleet.view'
+            )
+            ->group(function () {
+                Route::get(
+                    '/',
+                    [
+                        MasterFleetController::class,
+                        'index',
+                    ]
+                )->name('index');
+
+                /*
+                |--------------------------------------------------------------------------
+                | Master TLPG / Terminal
+                |--------------------------------------------------------------------------
+                */
+
+                Route::get(
+                    '/terminals',
+                    [
+                        FleetTerminalController::class,
+                        'index',
+                    ]
+                )->name('terminals.index');
+
+                Route::get(
+                    '/terminals/create',
+                    [
+                        FleetTerminalController::class,
+                        'create',
+                    ]
+                )
+                    ->middleware(
+                        'can:fleet-terminal.create'
+                    )
+                    ->name('terminals.create');
+
+                Route::post(
+                    '/terminals',
+                    [
+                        FleetTerminalController::class,
+                        'store',
+                    ]
+                )
+                    ->middleware(
+                        'can:fleet-terminal.create'
+                    )
+                    ->name('terminals.store');
+
+                Route::get(
+                    '/terminals/{terminal}/edit',
+                    [
+                        FleetTerminalController::class,
+                        'edit',
+                    ]
+                )
+                    ->middleware(
+                        'can:fleet-terminal.update'
+                    )
+                    ->name('terminals.edit');
+
+                Route::put(
+                    '/terminals/{terminal}',
+                    [
+                        FleetTerminalController::class,
+                        'update',
+                    ]
+                )
+                    ->middleware(
+                        'can:fleet-terminal.update'
+                    )
+                    ->name('terminals.update');
+
+                Route::patch(
+                    '/terminals/{terminal}/toggle-active',
+                    [
+                        FleetTerminalController::class,
+                        'toggleActive',
+                    ]
+                )
+                    ->middleware(
+                        'can:fleet-terminal.disable'
+                    )
+                    ->name(
+                        'terminals.toggle-active'
+                    );
+
+                /*
+                |--------------------------------------------------------------------------
+                | Master SPBE / Perusahaan
+                |--------------------------------------------------------------------------
+                */
+
+                Route::get(
+                    '/companies',
+                    [
+                        FleetCompanyController::class,
+                        'index',
+                    ]
+                )->name('companies.index');
+
+                Route::get(
+                    '/companies/create',
+                    [
+                        FleetCompanyController::class,
+                        'create',
+                    ]
+                )
+                    ->middleware(
+                        'can:fleet-company.create'
+                    )
+                    ->name('companies.create');
+
+                Route::post(
+                    '/companies',
+                    [
+                        FleetCompanyController::class,
+                        'store',
+                    ]
+                )
+                    ->middleware(
+                        'can:fleet-company.create'
+                    )
+                    ->name('companies.store');
+
+                Route::get(
+                    '/companies/{company}/edit',
+                    [
+                        FleetCompanyController::class,
+                        'edit',
+                    ]
+                )
+                    ->middleware(
+                        'can:fleet-company.update'
+                    )
+                    ->name('companies.edit');
+
+                Route::put(
+                    '/companies/{company}',
+                    [
+                        FleetCompanyController::class,
+                        'update',
+                    ]
+                )
+                    ->middleware(
+                        'can:fleet-company.update'
+                    )
+                    ->name('companies.update');
+
+                Route::patch(
+                    '/companies/{company}/toggle-active',
+                    [
+                        FleetCompanyController::class,
+                        'toggleActive',
+                    ]
+                )
+                    ->middleware(
+                        'can:fleet-company.disable'
+                    )
+                    ->name(
+                        'companies.toggle-active'
+                    );
+            });
+    }
 
 require __DIR__ . '/auth.php';
