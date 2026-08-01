@@ -53,4 +53,32 @@ return [
             'weight' => 3,
         ],
     ],
+
+    'distance' => [
+    /*
+     * Sesuaikan batas ini dengan aturan spreadsheet operasional.
+     *
+     * Nilai sementara:
+     * 0–100 km   = dekat
+     * >100–170   = sedang
+     * >170 km    = jauh
+     */
+
+    'near_max_km' => (float) env(
+        'MASTER_FLEET_NEAR_MAX_KM',
+        100
+    ),
+
+    'medium_max_km' => (float) env(
+        'MASTER_FLEET_MEDIUM_MAX_KM',
+        170
+    ),
+
+    'weights' => [
+        'near' => 1,
+        'medium' => 2,
+        'far' => 3,
+        'unknown' => 1,
+    ],
+    ],
 ];

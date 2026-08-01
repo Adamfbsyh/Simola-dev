@@ -186,6 +186,9 @@ return [
                 'master-fleet.view' =>
                     'Melihat Modul Master Fleet',
 
+                'master-fleet.import' =>
+                    'Mengunggah dan Memeriksa Spreadsheet Master Fleet',
+
                 'fleet-terminal.create' =>
                     'Menambah TLPG atau Terminal',
 

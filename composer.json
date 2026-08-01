@@ -11,7 +11,7 @@
         "google/apiclient": "*",
         "laravel/framework": "^12.0",
         "laravel/tinker": "^2.10.1",
-        "phpoffice/phpspreadsheet": "^5.8",
+        "phpoffice/phpspreadsheet": "^5.9",
         "setasign/fpdf": "^1.9",
         "setasign/fpdi": "^2.6",
         "smalot/pdfparser": "^2.12",

@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -18,9 +17,8 @@ class FleetDistanceProfile extends Model
         'distance_category',
         'weight',
         'distance_source',
-        'last_verified_at',
+        'calculated_at',
         'is_active',
-        'route_notes',
     ];
 
     protected function casts(): array
@@ -28,7 +26,7 @@ class FleetDistanceProfile extends Model
         return [
             'distance_km' => 'decimal:2',
             'weight' => 'integer',
-            'last_verified_at' => 'datetime',
+            'calculated_at' => 'datetime',
             'is_active' => 'boolean',
         ];
     }
@@ -46,15 +44,6 @@ class FleetDistanceProfile extends Model
         return $this->belongsTo(
             FleetTerminal::class,
             'terminal_id'
-        );
-    }
-
-    public function scopeActive(
-        Builder $query
-    ): Builder {
-        return $query->where(
-            'is_active',
-            true
         );
     }
 }

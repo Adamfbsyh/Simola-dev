@@ -21,6 +21,8 @@ class FleetVehicle extends Model
         'effective_until',
         'is_active',
         'notes',
+        'operational_type',
+        'operator_name',
     ];
 
     protected function casts(): array
@@ -38,28 +40,49 @@ class FleetVehicle extends Model
             function (FleetVehicle $vehicle): void {
                 $vehicle->plate_number =
                     self::formatPlateNumber(
-                        $vehicle->plate_number
+                        (string) $vehicle->plate_number
                     );
 
-                $vehicle
-                    ->normalized_plate_number =
+                $vehicle->normalized_plate_number =
                     self::normalizePlateNumber(
                         $vehicle->plate_number
                     );
+
+                $vehicle->operational_type =
+                    in_array(
+                        $vehicle->operational_type,
+                        [
+                            self::TYPE_P1,
+                            self::TYPE_P2,
+                        ],
+                        true
+                    )
+                        ? $vehicle->operational_type
+                        : self::TYPE_P2;
+
+                $vehicle->operator_name =
+                    $vehicle->operator_name !== null
+                    && trim($vehicle->operator_name) !== ''
+                        ? mb_strtoupper(
+                            trim($vehicle->operator_name),
+                            'UTF-8'
+                        )
+                        : null;
+
+                /*
+                * Kendaraan P1 tidak mempunyai SPBE tujuan tetap.
+                */
+                if ($vehicle->operational_type === self::TYPE_P1) {
+                    $vehicle->company_id = null;
+                }
             }
         );
     }
 
-    /**
-     * Mengubah nopol menjadi format tanpa spasi/tanda baca.
-     *
-     * Contoh:
-     * AE 8518 UJ -> AE8518UJ
-     */
     public static function normalizePlateNumber(
         string $value
     ): string {
-        return preg_replace(
+        return (string) preg_replace(
             '/[^A-Z0-9]/',
             '',
             mb_strtoupper(
@@ -69,12 +92,6 @@ class FleetVehicle extends Model
         );
     }
 
-    /**
-     * Membuat tampilan nopol lebih seragam.
-     *
-     * Contoh:
-     * ae8518uj -> AE 8518 UJ
-     */
     public static function formatPlateNumber(
         string $value
     ): string {
@@ -104,7 +121,7 @@ class FleetVehicle extends Model
 
         return mb_strtoupper(
             trim(
-                preg_replace(
+                (string) preg_replace(
                     '/\s+/',
                     ' ',
                     $value
@@ -124,13 +141,21 @@ class FleetVehicle extends Model
 
     public function plateHistories(): HasMany
     {
+        return $this
+            ->hasMany(
+                FleetVehiclePlateHistory::class,
+                'vehicle_id'
+            )
+            ->orderByDesc('effective_date')
+            ->orderByDesc('id');
+    }
+
+    public function groupingAssignments(): HasMany
+    {
         return $this->hasMany(
-            FleetVehiclePlateHistory::class,
+            FleetGroupingAssignment::class,
             'vehicle_id'
-        )
-            ->orderByDesc(
-                'effective_date'
-            );
+        );
     }
 
     public function scopeActive(
@@ -140,5 +165,28 @@ class FleetVehicle extends Model
             'is_active',
             true
         );
+    }
+
+    public const TYPE_P1 = 'P1';
+
+    public const TYPE_P2 = 'P2';
+
+    public function isP1(): bool
+    {
+        return $this->operational_type === self::TYPE_P1;
+    }
+
+    public function isP2(): bool
+    {
+        return $this->operational_type === self::TYPE_P2;
+    }
+
+    public function operationalTypeLabel(): string
+    {
+        return match ($this->operational_type) {
+            self::TYPE_P1 => 'P1 — Tujuan Fleksibel',
+            self::TYPE_P2 => 'P2 — SPBE Tujuan Tetap',
+            default => 'Belum Ditentukan',
+        };
     }
 }
