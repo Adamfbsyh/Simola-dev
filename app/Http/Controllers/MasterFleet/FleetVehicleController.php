@@ -36,6 +36,20 @@ class FleetVehicleController extends Controller
                     ]),
                 ],
 
+                'operational_type' => [
+                    'nullable',
+                    Rule::in([
+                        FleetVehicle::TYPE_P1,
+                        FleetVehicle::TYPE_P2,
+                    ]),
+                ],
+
+                'operator_name' => [
+                    'nullable',
+                    'string',
+                    'max:255',
+                ],
+
                 'company_id' => [
                     'nullable',
                     'integer',
@@ -93,6 +107,11 @@ class FleetVehicleController extends Controller
                         )
                         ->orWhere(
                             'unit_code',
+                            'like',
+                            '%' . $search . '%'
+                        )
+                        ->orWhere(
+                            'operator_name',
                             'like',
                             '%' . $search . '%'
                         )
@@ -161,6 +180,37 @@ class FleetVehicleController extends Controller
             );
         }
 
+        if (
+            !empty(
+                $validated['operational_type']
+            )
+        ) {
+            $query->where(
+                'operational_type',
+                $validated['operational_type']
+            );
+        }
+
+        $selectedOperatorName =
+            trim(
+                (string) (
+                    $validated['operator_name']
+                    ?? ''
+                )
+            );
+
+        if ($selectedOperatorName !== '') {
+            $query
+                ->where(
+                    'operational_type',
+                    FleetVehicle::TYPE_P1
+                )
+                ->where(
+                    'operator_name',
+                    $selectedOperatorName
+                );
+        }
+
         if (!empty($validated['company_id'])) {
             $query->where(
                 'company_id',
@@ -179,6 +229,7 @@ class FleetVehicleController extends Controller
         $vehicles =
             $query
                 ->orderByDesc('is_active')
+                ->orderBy('operational_type')
                 ->orderBy('plate_number')
                 ->paginate($perPage)
                 ->withQueryString();
@@ -261,6 +312,28 @@ class FleetVehicleController extends Controller
                     'is_active',
                 ]);
 
+        $operatorNames =
+            FleetVehicle::query()
+                ->where(
+                    'operational_type',
+                    FleetVehicle::TYPE_P1
+                )
+                ->whereNotNull(
+                    'operator_name'
+                )
+                ->where(
+                    'operator_name',
+                    '<>',
+                    ''
+                )
+                ->distinct()
+                ->orderBy(
+                    'operator_name'
+                )
+                ->pluck(
+                    'operator_name'
+                );
+
         return view(
             'master-fleet.vehicles.index',
             [
@@ -269,6 +342,9 @@ class FleetVehicleController extends Controller
 
                 'companies' =>
                     $companies,
+
+                'operatorNames' =>
+                    $operatorNames,
 
                 'publishedPeriod' =>
                     $publishedPeriod,
@@ -302,6 +378,22 @@ class FleetVehicleController extends Controller
                         )
                         ->count(),
 
+                'p1Count' =>
+                    FleetVehicle::query()
+                        ->where(
+                            'operational_type',
+                            FleetVehicle::TYPE_P1
+                        )
+                        ->count(),
+
+                'p2Count' =>
+                    FleetVehicle::query()
+                        ->where(
+                            'operational_type',
+                            FleetVehicle::TYPE_P2
+                        )
+                        ->count(),
+
                 'historyCount' =>
                     FleetVehiclePlateHistory::query()
                         ->count(),
@@ -313,6 +405,13 @@ class FleetVehicleController extends Controller
                     'status' =>
                         $validated['status']
                         ?? '',
+
+                    'operational_type' =>
+                        $validated['operational_type']
+                        ?? '',
+
+                    'operator_name' =>
+                        $selectedOperatorName,
 
                     'company_id' =>
                         $validated['company_id']
@@ -333,6 +432,8 @@ class FleetVehicleController extends Controller
                 'vehicle' =>
                     new FleetVehicle([
                         'is_active' => true,
+                        'operational_type' =>
+                            FleetVehicle::TYPE_P2,
                         'effective_from' =>
                             now()->toDateString(),
                     ]),
@@ -525,10 +626,38 @@ class FleetVehicleController extends Controller
                 'max:30',
             ],
 
+            'operational_type' => [
+                'required',
+                Rule::in([
+                    FleetVehicle::TYPE_P1,
+                    FleetVehicle::TYPE_P2,
+                ]),
+            ],
+
             'company_id' => [
+                Rule::requiredIf(
+                    fn (): bool =>
+                        (string) $request->input(
+                            'operational_type',
+                            FleetVehicle::TYPE_P2
+                        ) === FleetVehicle::TYPE_P2
+                ),
                 'nullable',
                 'integer',
                 'exists:fleet_companies,id',
+            ],
+
+            'operator_name' => [
+                Rule::requiredIf(
+                    fn (): bool =>
+                        (string) $request->input(
+                            'operational_type',
+                            FleetVehicle::TYPE_P2
+                        ) === FleetVehicle::TYPE_P1
+                ),
+                'nullable',
+                'string',
+                'max:255',
             ],
 
             'unit_code' => [
@@ -582,6 +711,19 @@ class FleetVehicleController extends Controller
 
         $validated['is_active'] =
             $request->boolean('is_active');
+
+        /*
+         * Bersihkan field yang tidak digunakan agar satu kendaraan
+         * tidak mempunyai identitas P1 dan P2 secara bersamaan.
+         */
+        if (
+            $validated['operational_type']
+            === FleetVehicle::TYPE_P1
+        ) {
+            $validated['company_id'] = null;
+        } else {
+            $validated['operator_name'] = null;
+        }
 
         return $validated;
     }
