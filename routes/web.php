@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\MasterFleet\MasterFleetPcSetController;
 use App\Http\Controllers\MasterFleet\MasterFleetGroupingController;
 use App\Http\Controllers\MasterFleet\FleetVehicleController;
+use App\Http\Controllers\MasterFleet\MasterFleetGoogleWorkspaceController;
 
 /*
 |--------------------------------------------------------------------------
@@ -749,6 +750,89 @@ if (config('master-fleet.enabled')) {
                     'index',
                 ]
             )->name('pc-set.index');
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Google Workspace Master Fleet
+            |--------------------------------------------------------------------------
+            */
+
+            Route::get(
+                '/google-workspace',
+                [
+                    MasterFleetGoogleWorkspaceController::class,
+                    'index',
+                ]
+            )->name('google-workspace.index');
+
+            Route::get(
+                '/google-workspace/connect/{purpose}',
+                [
+                    MasterFleetGoogleWorkspaceController::class,
+                    'connect',
+                ]
+            )
+                ->where(
+                    'purpose',
+                    'k302|evidence'
+                )
+                ->middleware('can:master-fleet.import')
+                ->name('google-workspace.connect');
+
+            Route::get(
+                '/google-workspace/callback',
+                [
+                    MasterFleetGoogleWorkspaceController::class,
+                    'callback',
+                ]
+            )
+                ->middleware('can:master-fleet.import')
+                ->name('google-workspace.callback');
+
+            Route::delete(
+                '/google-workspace/disconnect/{purpose}',
+                [
+                    MasterFleetGoogleWorkspaceController::class,
+                    'disconnect',
+                ]
+            )
+                ->where(
+                    'purpose',
+                    'k302|evidence'
+                )
+                ->middleware('can:master-fleet.import')
+                ->name('google-workspace.disconnect');
+
+            Route::post(
+                '/google-workspace/sync-spreadsheet',
+                [
+                    MasterFleetGoogleWorkspaceController::class,
+                    'syncSpreadsheet',
+                ]
+            )
+                ->middleware('can:master-fleet.import')
+                ->name('google-workspace.sync-spreadsheet');
+
+            Route::post(
+                '/google-workspace/generate-k302-daily',
+                [
+                    MasterFleetGoogleWorkspaceController::class,
+                    'generateK302Daily',
+                ]
+            )
+                ->middleware('can:master-fleet.import')
+                ->name('google-workspace.generate-k302-daily');
+
+            Route::post(
+                '/google-workspace/generate-evidence',
+                [
+                    MasterFleetGoogleWorkspaceController::class,
+                    'generateEvidence',
+                ]
+            )
+                ->middleware('can:master-fleet.import')
+                ->name('google-workspace.generate-evidence');
 
             /*
             |--------------------------------------------------------------------------
