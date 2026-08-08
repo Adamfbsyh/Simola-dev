@@ -220,6 +220,32 @@ class MasterFleetImportController extends Controller
                 )
             );
 
+        $p1VehicleCount =
+            (int) data_get(
+                $analysis,
+                'summary.p1_vehicle_count',
+                0
+            );
+
+        $p2VehicleCount =
+            (int) data_get(
+                $analysis,
+                'summary.p2_vehicle_count',
+                max(
+                    0,
+                    $officialVehicleCount
+                    -
+                    $p1VehicleCount
+                )
+            );
+
+        $readyForImport =
+            (bool) data_get(
+                $analysis,
+                'summary.ready_for_import',
+                false
+            );
+
         $validated =
             $request->validate(
                 [
@@ -255,6 +281,13 @@ class MasterFleetImportController extends Controller
                         'Tanggal berlaku tidak valid.',
                 ]
             );
+
+        if (!$readyForImport) {
+            return back()->with(
+                'error',
+                'Hasil analisis belum aman untuk diimpor. Periksa data invalid pada workbook.'
+            );
+        }
 
         if (
             (int) $validated[
@@ -315,7 +348,19 @@ class MasterFleetImportController extends Controller
                     'assignments_created'
                 ]
                 .
-                ' pembagian PC telah disimpan.';
+                ' pembagian PC telah disimpan. '
+                .
+                ($result[
+                    'p1_vehicle_count'
+                ] ?? $p1VehicleCount)
+                .
+                ' kendaraan P1 dan '
+                .
+                ($result[
+                    'p2_vehicle_count'
+                ] ?? $p2VehicleCount)
+                .
+                ' kendaraan P2 berhasil dipisahkan.';
 
             if (
                 $result[

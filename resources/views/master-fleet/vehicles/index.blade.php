@@ -10,8 +10,8 @@
                 </h2>
 
                 <p class="mt-1 text-sm text-gray-500">
-                    Kelola nopol, perusahaan, status kendaraan,
-                    dan histori perubahan nomor polisi.
+                    Kelola nopol, tipe operasional, SPBE tujuan,
+                    operator P1, status, dan histori perubahan nomor polisi.
                 </p>
             </div>
 
@@ -64,7 +64,8 @@
             @endif
 
             <section
-                class="grid grid-cols-2 gap-4 lg:grid-cols-4"
+                class="grid grid-cols-2 gap-4 md:grid-cols-3
+                       xl:grid-cols-6"
             >
                 <div
                     class="rounded-xl border border-gray-200
@@ -78,6 +79,50 @@
                         {{ $totalCount }}
                     </p>
                 </div>
+
+                <a
+                    href="{{ route(
+                        'master-fleet.vehicles.index',
+                        ['operational_type' => 'P1']
+                    ) }}"
+                    class="rounded-xl border border-indigo-200
+                           bg-indigo-50 p-5 transition
+                           hover:border-indigo-400"
+                >
+                    <p class="text-xs font-semibold uppercase text-indigo-700">
+                        Kendaraan P1
+                    </p>
+
+                    <p class="mt-2 text-3xl font-bold text-indigo-800">
+                        {{ $p1Count }}
+                    </p>
+
+                    <p class="mt-1 text-xs text-indigo-600">
+                        Tujuan fleksibel
+                    </p>
+                </a>
+
+                <a
+                    href="{{ route(
+                        'master-fleet.vehicles.index',
+                        ['operational_type' => 'P2']
+                    ) }}"
+                    class="rounded-xl border border-blue-200
+                           bg-blue-50 p-5 transition
+                           hover:border-blue-400"
+                >
+                    <p class="text-xs font-semibold uppercase text-blue-700">
+                        Kendaraan P2
+                    </p>
+
+                    <p class="mt-2 text-3xl font-bold text-blue-800">
+                        {{ $p2Count }}
+                    </p>
+
+                    <p class="mt-1 text-xs text-blue-600">
+                        SPBE tujuan tetap
+                    </p>
+                </a>
 
                 <div
                     class="rounded-xl border border-green-200
@@ -106,14 +151,14 @@
                 </div>
 
                 <div
-                    class="rounded-xl border border-blue-200
-                           bg-blue-50 p-5"
+                    class="rounded-xl border border-gray-200
+                           bg-white p-5 shadow-sm"
                 >
-                    <p class="text-xs font-semibold uppercase text-blue-700">
+                    <p class="text-xs font-semibold uppercase text-gray-500">
                         Riwayat Nopol
                     </p>
 
-                    <p class="mt-2 text-3xl font-bold text-blue-800">
+                    <p class="mt-2 text-3xl font-bold">
                         {{ $historyCount }}
                     </p>
                 </div>
@@ -129,9 +174,9 @@
                     action="{{ route(
                         'master-fleet.vehicles.index'
                     ) }}"
-                    class="grid gap-4 md:grid-cols-2 xl:grid-cols-5"
+                    class="grid gap-4 md:grid-cols-2 xl:grid-cols-7"
                 >
-                    <div class="xl:col-span-2">
+                    <div class="md:col-span-2 xl:col-span-2">
                         <label
                             for="vehicle-search"
                             class="mb-2 block text-sm font-semibold
@@ -145,12 +190,54 @@
                             type="search"
                             name="q"
                             value="{{ $filters['q'] }}"
-                            placeholder="Ketik nopol lama/baru, perusahaan, atau kode unit..."
+                            placeholder="Nopol, operator P1, SPBE, atau kode unit..."
                             autocomplete="off"
                             data-live-search
                             class="w-full rounded-lg border-gray-300
                                    shadow-sm"
                         >
+                    </div>
+
+                    <div>
+                        <label
+                            for="vehicle-operational-type"
+                            class="mb-2 block text-sm font-semibold
+                                   text-gray-700"
+                        >
+                            Tipe Operasional
+                        </label>
+
+                        <select
+                            id="vehicle-operational-type"
+                            name="operational_type"
+                            data-auto-submit
+                            data-operational-type-filter
+                            class="w-full rounded-lg border-gray-300"
+                        >
+                            <option value="">
+                                Semua Tipe
+                            </option>
+
+                            <option
+                                value="P1"
+                                @selected(
+                                    $filters['operational_type']
+                                    === 'P1'
+                                )
+                            >
+                                P1 — Tujuan Fleksibel
+                            </option>
+
+                            <option
+                                value="P2"
+                                @selected(
+                                    $filters['operational_type']
+                                    === 'P2'
+                                )
+                            >
+                                P2 — SPBE Tujuan Tetap
+                            </option>
+                        </select>
                     </div>
 
                     <div>
@@ -197,16 +284,49 @@
                             class="mb-2 block text-sm font-semibold
                                    text-gray-700"
                         >
-                            Perusahaan
+                            Operator P1
+                        </label>
+
+                        <select
+                            name="operator_name"
+                            data-auto-submit
+                            data-operator-filter
+                            class="w-full rounded-lg border-gray-300"
+                        >
+                            <option value="">
+                                Semua Operator P1
+                            </option>
+
+                            @foreach($operatorNames as $operatorName)
+                                <option
+                                    value="{{ $operatorName }}"
+                                    @selected(
+                                        $filters['operator_name']
+                                        === $operatorName
+                                    )
+                                >
+                                    {{ $operatorName }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div>
+                        <label
+                            class="mb-2 block text-sm font-semibold
+                                   text-gray-700"
+                        >
+                            SPBE Tujuan P2
                         </label>
 
                         <select
                             name="company_id"
                             data-auto-submit
+                            data-company-filter
                             class="w-full rounded-lg border-gray-300"
                         >
                             <option value="">
-                                Semua Perusahaan
+                                Semua SPBE Tujuan
                             </option>
 
                             @foreach($companies as $company)
@@ -254,7 +374,7 @@
 
                     <div
                         class="flex gap-2 md:col-span-2
-                               xl:col-span-5 xl:justify-end"
+                               xl:col-span-7 xl:justify-end"
                     >
                         <a
                             href="{{ route(
@@ -305,8 +425,12 @@
                                     Nopol
                                 </th>
 
+                                <th class="px-4 py-3 text-center">
+                                    Tipe
+                                </th>
+
                                 <th class="px-4 py-3 text-left">
-                                    Perusahaan
+                                    SPBE / Operator
                                 </th>
 
                                 <th class="px-4 py-3 text-left">
@@ -359,11 +483,50 @@
                                         {{ $vehicle->plate_number }}
                                     </td>
 
+                                    <td class="px-4 py-3 text-center">
+                                        @if($vehicle->isP1())
+                                            <span
+                                                class="rounded-full bg-indigo-100
+                                                       px-3 py-1 text-xs
+                                                       font-bold text-indigo-700"
+                                            >
+                                                P1
+                                            </span>
+                                        @else
+                                            <span
+                                                class="rounded-full bg-blue-100
+                                                       px-3 py-1 text-xs
+                                                       font-bold text-blue-700"
+                                            >
+                                                P2
+                                            </span>
+                                        @endif
+                                    </td>
+
                                     <td class="px-4 py-3">
-                                        {{
-                                            $vehicle->company?->name
-                                            ?? 'Belum tersedia'
-                                        }}
+                                        @if($vehicle->isP1())
+                                            <div class="font-semibold text-indigo-800">
+                                                {{
+                                                    $vehicle->operator_name
+                                                    ?: 'Operator belum diisi'
+                                                }}
+                                            </div>
+
+                                            <div class="mt-0.5 text-xs text-gray-500">
+                                                Operator / pemilik P1
+                                            </div>
+                                        @else
+                                            <div class="font-semibold text-gray-800">
+                                                {{
+                                                    $vehicle->company?->name
+                                                    ?? 'SPBE belum tersedia'
+                                                }}
+                                            </div>
+
+                                            <div class="mt-0.5 text-xs text-gray-500">
+                                                SPBE tujuan P2
+                                            </div>
+                                        @endif
                                     </td>
 
                                     <td class="px-4 py-3">
@@ -501,7 +664,7 @@
                             @empty
                                 <tr>
                                     <td
-                                        colspan="8"
+                                        colspan="9"
                                         class="px-5 py-12 text-center
                                                text-gray-500"
                                     >
@@ -524,6 +687,55 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            const operationalTypeFilter =
+                document.querySelector(
+                    '[data-operational-type-filter]'
+                );
+
+            const operatorFilter =
+                document.querySelector(
+                    '[data-operator-filter]'
+                );
+
+            const companyFilter =
+                document.querySelector(
+                    '[data-company-filter]'
+                );
+
+            const syncOperationalFilters =
+                function () {
+                    const selectedType =
+                        operationalTypeFilter?.value
+                        ?? '';
+
+                    if (operatorFilter) {
+                        operatorFilter.disabled =
+                            selectedType === 'P2';
+
+                        if (selectedType === 'P2') {
+                            operatorFilter.value = '';
+                        }
+                    }
+
+                    if (companyFilter) {
+                        companyFilter.disabled =
+                            selectedType === 'P1';
+
+                        if (selectedType === 'P1') {
+                            companyFilter.value = '';
+                        }
+                    }
+                };
+
+            if (operationalTypeFilter) {
+                operationalTypeFilter.addEventListener(
+                    'change',
+                    syncOperationalFilters
+                );
+            }
+
+            syncOperationalFilters();
+
             document
                 .querySelectorAll('[data-live-search]')
                 .forEach(function (input) {

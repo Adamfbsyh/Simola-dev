@@ -96,6 +96,14 @@ class MasterFleetMigrationAnalysisService
                     ]
                 );
 
+            $p1Sheet =
+                $this->findOptionalSheet(
+                    $spreadsheet,
+                    [
+                        'KENDARAAN P1',
+                    ]
+                );
+
             $terminals =
                 $this->readTerminals(
                     $terminalSheet
@@ -114,6 +122,12 @@ class MasterFleetMigrationAnalysisService
             $final =
                 $this->readFinalGrouping(
                     $finalSheet
+                );
+
+            $p1 =
+                $this->readP1Vehicles(
+                    $p1Sheet,
+                    $final
                 );
 
             $comparison =
@@ -219,13 +233,63 @@ class MasterFleetMigrationAnalysisService
                             ]
                         ),
 
+                    'p1_sheet_found' =>
+                        (bool) (
+                            $p1['sheet_found']
+                            ?? false
+                        ),
+
+                    'p1_source_rows' =>
+                        (int) (
+                            $p1['source_row_count']
+                            ?? 0
+                        ),
+
+                    'p1_vehicle_count' =>
+                        count(
+                            $p1['by_plate']
+                        ),
+
+                    'p2_vehicle_count' =>
+                        max(
+                            0,
+                            count(
+                                $final['by_plate']
+                            )
+                            -
+                            count(
+                                $p1['by_plate']
+                            )
+                        ),
+
+                    'p1_duplicates_resolved' =>
+                        count(
+                            $p1['duplicates']
+                        ),
+
+                    'p1_invalid' =>
+                        count(
+                            $p1['invalid']
+                        ),
+
+                    'p1_missing_in_final' =>
+                        count(
+                            $p1['missing_in_final']
+                        ),
+
+                    'p1_conflicts_resolved' =>
+                        count(
+                            $p1['resolved_conflicts']
+                        ),
+
                     'ready_for_import' =>
                         $this->isReadyForImport(
                             $terminals,
                             $companies,
                             $rotation,
                             $final,
-                            $comparison
+                            $comparison,
+                            $p1
                         ),
 
                     'official_vehicle_count' =>
@@ -259,6 +323,9 @@ class MasterFleetMigrationAnalysisService
 
                 'final' =>
                     $final,
+
+                'p1' =>
+                    $p1,
 
                 'comparison' =>
                     $comparison,
@@ -295,6 +362,13 @@ class MasterFleetMigrationAnalysisService
                         'C' => 'TLPG',
                         'D' => 'Perusahaan',
                         'E' => 'PC final',
+                    ],
+
+                    'KENDARAAN P1' => [
+                        'start_row' => 2,
+                        'A' => 'Nopol',
+                        'B' => 'TLPG referensi',
+                        'C' => 'Operator/Pemilik P1',
                     ],
                 ],
             ];
@@ -343,6 +417,38 @@ class MasterFleetMigrationAnalysisService
                 $possibleNames
             )
         );
+    }
+
+    private function findOptionalSheet(
+        Spreadsheet $spreadsheet,
+        array $possibleNames
+    ): ?Worksheet {
+        foreach (
+            $spreadsheet->getWorksheetIterator()
+            as $worksheet
+        ) {
+            $currentName =
+                $this->normalizeText(
+                    $worksheet->getTitle()
+                );
+
+            foreach (
+                $possibleNames
+                as $possibleName
+            ) {
+                if (
+                    $currentName
+                    ===
+                    $this->normalizeText(
+                        $possibleName
+                    )
+                ) {
+                    return $worksheet;
+                }
+            }
+        }
+
+        return null;
     }
 
     private function readTerminals(
@@ -963,6 +1069,440 @@ class MasterFleetMigrationAnalysisService
         ];
     }
 
+    private function readP1Vehicles(
+        ?Worksheet $sheet,
+        array $final
+    ): array {
+        if ($sheet === null) {
+            return [
+                'sheet_found' => false,
+                'source_row_count' => 0,
+                'items' => [],
+                'by_plate' => [],
+                'duplicates' => [],
+                'invalid' => [],
+                'missing_in_final' => [],
+                'resolved_conflicts' => [],
+            ];
+        }
+
+        $candidatesByPlate = [];
+        $invalid = [];
+        $sourceRowCount = 0;
+
+        $highestRow =
+            $sheet->getHighestDataRow();
+
+        for (
+            $row = 2;
+            $row <= $highestRow;
+            $row++
+        ) {
+            $plate =
+                $this->cleanText(
+                    $this->cellValue(
+                        $sheet,
+                        'A' . $row
+                    )
+                );
+
+            $terminal =
+                $this->cleanText(
+                    $this->cellValue(
+                        $sheet,
+                        'B' . $row
+                    )
+                );
+
+            $operatorName =
+                $this->cleanText(
+                    $this->cellValue(
+                        $sheet,
+                        'C' . $row
+                    )
+                );
+
+            if (
+                $plate === ''
+                &&
+                $terminal === ''
+                &&
+                $operatorName === ''
+            ) {
+                continue;
+            }
+
+            $sourceRowCount++;
+
+            if ($plate === '') {
+                $invalid[] = [
+                    'row' => $row,
+                    'reason' =>
+                        'Nopol pada KENDARAAN P1 kosong.',
+                ];
+
+                continue;
+            }
+
+            $normalizedPlate =
+                FleetVehicle::normalizePlateNumber(
+                    $plate
+                );
+
+            if ($normalizedPlate === '') {
+                $invalid[] = [
+                    'row' => $row,
+                    'plate_number' => $plate,
+                    'reason' =>
+                        'Format nopol P1 tidak valid.',
+                ];
+
+                continue;
+            }
+
+            if ($operatorName === '') {
+                $invalid[] = [
+                    'row' => $row,
+                    'plate_number' =>
+                        FleetVehicle::formatPlateNumber(
+                            $plate
+                        ),
+
+                    'reason' =>
+                        'Operator/pemilik kendaraan P1 kosong.',
+                ];
+
+                continue;
+            }
+
+            $candidate = [
+                'row' => $row,
+
+                'plate_number' =>
+                    FleetVehicle::formatPlateNumber(
+                        $plate
+                    ),
+
+                'normalized_plate_number' =>
+                    $normalizedPlate,
+
+                'terminal' =>
+                    $terminal,
+
+                'normalized_terminal' =>
+                    $this->normalizeText(
+                        $terminal
+                    ),
+
+                'operator_name' =>
+                    mb_strtoupper(
+                        $operatorName,
+                        'UTF-8'
+                    ),
+
+                'normalized_operator_name' =>
+                    $this->normalizeText(
+                        $operatorName
+                    ),
+            ];
+
+            $candidatesByPlate[
+                $normalizedPlate
+            ][] = $candidate;
+        }
+
+        $items = [];
+        $byPlate = [];
+        $duplicates = [];
+        $missingInFinal = [];
+        $resolvedConflicts = [];
+
+        foreach (
+            $candidatesByPlate
+            as $plateKey => $candidates
+        ) {
+            $finalItem =
+                $final['by_plate'][
+                    $plateKey
+                ]
+                ?? null;
+
+            if ($finalItem === null) {
+                $missingInFinal[] = [
+                    'plate_number' =>
+                        $candidates[0][
+                            'plate_number'
+                        ],
+
+                    'source_rows' =>
+                        array_values(
+                            array_map(
+                                static fn (array $item): int =>
+                                    (int) $item['row'],
+                                $candidates
+                            )
+                        ),
+
+                    'reason' =>
+                        'Nopol P1 tidak terdapat pada PC SET UTAMA.',
+                ];
+
+                continue;
+            }
+
+            $finalTerminal =
+                $this->normalizeText(
+                    (string) (
+                        $finalItem['terminal']
+                        ?? ''
+                    )
+                );
+
+            $finalOperator =
+                $this->normalizeText(
+                    (string) (
+                        $finalItem['company']
+                        ?? ''
+                    )
+                );
+
+            usort(
+                $candidates,
+                static function (
+                    array $left,
+                    array $right
+                ) use (
+                    $finalTerminal,
+                    $finalOperator
+                ): int {
+                    $leftScore =
+                        (
+                            $finalTerminal !== ''
+                            &&
+                            $left[
+                                'normalized_terminal'
+                            ] === $finalTerminal
+                                ? 2
+                                : 0
+                        )
+                        +
+                        (
+                            $finalOperator !== ''
+                            &&
+                            $left[
+                                'normalized_operator_name'
+                            ] === $finalOperator
+                                ? 4
+                                : 0
+                        );
+
+                    $rightScore =
+                        (
+                            $finalTerminal !== ''
+                            &&
+                            $right[
+                                'normalized_terminal'
+                            ] === $finalTerminal
+                                ? 2
+                                : 0
+                        )
+                        +
+                        (
+                            $finalOperator !== ''
+                            &&
+                            $right[
+                                'normalized_operator_name'
+                            ] === $finalOperator
+                                ? 4
+                                : 0
+                        );
+
+                    if ($leftScore !== $rightScore) {
+                        return $rightScore
+                            <=>
+                            $leftScore;
+                    }
+
+                    return (int) $right['row']
+                        <=>
+                        (int) $left['row'];
+                }
+            );
+
+            $selected =
+                $candidates[0];
+
+            $canonicalTerminal =
+                trim(
+                    (string) (
+                        $finalItem['terminal']
+                        ?? ''
+                    )
+                );
+
+            $canonicalOperator =
+                trim(
+                    (string) (
+                        $finalItem['company']
+                        ?? ''
+                    )
+                );
+
+            if ($canonicalTerminal === '') {
+                $canonicalTerminal =
+                    $selected['terminal'];
+            }
+
+            if ($canonicalOperator === '') {
+                $canonicalOperator =
+                    $selected['operator_name'];
+            }
+
+            $canonicalOperator =
+                mb_strtoupper(
+                    $this->cleanText(
+                        $canonicalOperator
+                    ),
+                    'UTF-8'
+                );
+
+            if (
+                count($candidates) > 1
+            ) {
+                $duplicates[] = [
+                    'plate_number' =>
+                        $selected['plate_number'],
+
+                    'source_rows' =>
+                        array_values(
+                            array_map(
+                                static fn (array $item): int =>
+                                    (int) $item['row'],
+                                $candidates
+                            )
+                        ),
+
+                    'selected_row' =>
+                        (int) $selected['row'],
+
+                    'selected_terminal' =>
+                        $canonicalTerminal,
+
+                    'selected_operator_name' =>
+                        $canonicalOperator,
+
+                    'reason' =>
+                        'Duplikat diselesaikan menggunakan PC SET UTAMA sebagai referensi resmi.',
+                ];
+            }
+
+            if (
+                $selected[
+                    'normalized_terminal'
+                ] !==
+                $this->normalizeText(
+                    $canonicalTerminal
+                )
+                ||
+                $selected[
+                    'normalized_operator_name'
+                ] !==
+                $this->normalizeText(
+                    $canonicalOperator
+                )
+            ) {
+                $resolvedConflicts[] = [
+                    'plate_number' =>
+                        $selected['plate_number'],
+
+                    'selected_row' =>
+                        (int) $selected['row'],
+
+                    'source_terminal' =>
+                        $selected['terminal'],
+
+                    'official_terminal' =>
+                        $canonicalTerminal,
+
+                    'source_operator_name' =>
+                        $selected[
+                            'operator_name'
+                        ],
+
+                    'official_operator_name' =>
+                        $canonicalOperator,
+                ];
+            }
+
+            $item = [
+                ...$selected,
+
+                'terminal' =>
+                    $canonicalTerminal,
+
+                'normalized_terminal' =>
+                    $this->normalizeText(
+                        $canonicalTerminal
+                    ),
+
+                'operator_name' =>
+                    $canonicalOperator,
+
+                'normalized_operator_name' =>
+                    $this->normalizeText(
+                        $canonicalOperator
+                    ),
+
+                'source_rows' =>
+                    array_values(
+                        array_map(
+                            static fn (array $candidate): int =>
+                                (int) $candidate['row'],
+                            $candidates
+                        )
+                    ),
+
+                'official_final_row' =>
+                    $finalItem['row']
+                    ?? null,
+            ];
+
+            $items[] = $item;
+
+            $byPlate[
+                $plateKey
+            ] = $item;
+        }
+
+        return [
+            'sheet_found' => true,
+            'source_row_count' =>
+                $sourceRowCount,
+
+            'items' =>
+                array_slice(
+                    $items,
+                    0,
+                    self::MAX_DETAIL_ROWS
+                ),
+
+            'by_plate' =>
+                $byPlate,
+
+            'duplicates' =>
+                $duplicates,
+
+            'invalid' =>
+                $invalid,
+
+            'missing_in_final' =>
+                $missingInFinal,
+
+            'resolved_conflicts' =>
+                $resolvedConflicts,
+        ];
+    }
+
     private function compareGrouping(
         array $rotation,
         array $final
@@ -1381,11 +1921,12 @@ class MasterFleetMigrationAnalysisService
     }
 
     private function isReadyForImport(
-    array $terminals,
-    array $companies,
-    array $rotation,
-    array $final,
-    array $comparison
+        array $terminals,
+        array $companies,
+        array $rotation,
+        array $final,
+        array $comparison,
+        array $p1
     ): bool {
         return count(
             $terminals['invalid']
@@ -1405,6 +1946,14 @@ class MasterFleetMigrationAnalysisService
             &&
             count(
                 $final['invalid']
+            ) === 0
+            &&
+            count(
+                $p1['invalid']
+            ) === 0
+            &&
+            count(
+                $p1['missing_in_final']
             ) === 0;
     }
 }

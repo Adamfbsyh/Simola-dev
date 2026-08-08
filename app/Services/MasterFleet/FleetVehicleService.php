@@ -42,6 +42,26 @@ class FleetVehicleService
                         ?? true
                     );
 
+                $operationalType =
+                    $this->normalizeOperationalType(
+                        $data['operational_type']
+                        ?? FleetVehicle::TYPE_P2
+                    );
+
+                $companyId =
+                    $operationalType === FleetVehicle::TYPE_P2
+                    && !empty($data['company_id'])
+                        ? (int) $data['company_id']
+                        : null;
+
+                $operatorName =
+                    $operationalType === FleetVehicle::TYPE_P1
+                        ? $this->nullableUppercaseString(
+                            $data['operator_name']
+                            ?? null
+                        )
+                        : null;
+
                 $vehicle =
                     FleetVehicle::query()->create([
                         'plate_number' =>
@@ -51,9 +71,13 @@ class FleetVehicleService
                             $normalizedPlate,
 
                         'company_id' =>
-                            !empty($data['company_id'])
-                                ? (int) $data['company_id']
-                                : null,
+                            $companyId,
+
+                        'operational_type' =>
+                            $operationalType,
+
+                        'operator_name' =>
+                            $operatorName,
 
                         'unit_code' =>
                             $this->nullableString(
@@ -124,6 +148,13 @@ class FleetVehicleService
                 $oldCompanyId =
                     $lockedVehicle->company_id;
 
+                $oldOperationalType =
+                    $lockedVehicle->operational_type
+                    ?: FleetVehicle::TYPE_P2;
+
+                $oldOperatorName =
+                    $lockedVehicle->operator_name;
+
                 $newPlate =
                     FleetVehicle::formatPlateNumber(
                         (string) $data['plate_number']
@@ -145,9 +176,24 @@ class FleetVehicleService
                     $lockedVehicle->id
                 );
 
+                $newOperationalType =
+                    $this->normalizeOperationalType(
+                        $data['operational_type']
+                        ?? FleetVehicle::TYPE_P2
+                    );
+
                 $newCompanyId =
-                    !empty($data['company_id'])
+                    $newOperationalType === FleetVehicle::TYPE_P2
+                    && !empty($data['company_id'])
                         ? (int) $data['company_id']
+                        : null;
+
+                $newOperatorName =
+                    $newOperationalType === FleetVehicle::TYPE_P1
+                        ? $this->nullableUppercaseString(
+                            $data['operator_name']
+                            ?? null
+                        )
                         : null;
 
                 $plateChanged =
@@ -159,6 +205,16 @@ class FleetVehicleService
                     (int) ($oldCompanyId ?? 0)
                     !==
                     (int) ($newCompanyId ?? 0);
+
+                $operationalTypeChanged =
+                    $oldOperationalType
+                    !==
+                    $newOperationalType;
+
+                $operatorNameChanged =
+                    (string) ($oldOperatorName ?? '')
+                    !==
+                    (string) ($newOperatorName ?? '');
 
                 if ($plateChanged) {
                     $reason =
@@ -193,6 +249,12 @@ class FleetVehicleService
 
                     'company_id' =>
                         $newCompanyId,
+
+                    'operational_type' =>
+                        $newOperationalType,
+
+                    'operator_name' =>
+                        $newOperatorName,
 
                     'unit_code' =>
                         $this->nullableString(
@@ -267,6 +329,10 @@ class FleetVehicleService
                     $plateChanged
                     ||
                     $companyChanged
+                    ||
+                    $operationalTypeChanged
+                    ||
+                    $operatorNameChanged
                 ) {
                     $this->syncCurrentAssignments(
                         vehicle:
@@ -276,7 +342,13 @@ class FleetVehicleService
                             $plateChanged,
 
                         companyChanged:
-                            $companyChanged
+                            $companyChanged,
+
+                        operationalTypeChanged:
+                            $operationalTypeChanged,
+
+                        operatorNameChanged:
+                            $operatorNameChanged
                     );
                 }
 
@@ -330,7 +402,9 @@ class FleetVehicleService
     private function syncCurrentAssignments(
         FleetVehicle $vehicle,
         bool $plateChanged,
-        bool $companyChanged
+        bool $companyChanged,
+        bool $operationalTypeChanged,
+        bool $operatorNameChanged
     ): void {
         $company =
             $vehicle->company_id
@@ -397,6 +471,54 @@ class FleetVehicleService
 
                 $notes[] =
                     'Perusahaan berubah; profil jarak perlu dihitung ulang.';
+            }
+
+            if ($operationalTypeChanged) {
+                $updates['operational_type'] =
+                    $vehicle->operational_type;
+
+                $updates['company_id'] =
+                    $vehicle->company_id;
+
+                $updates[
+                    'company_name_snapshot'
+                ] = $company?->name;
+
+                $updates[
+                    'operator_name_snapshot'
+                ] = $vehicle->operator_name;
+
+                /*
+                 * Profil jarak P2 lama tidak boleh terbawa ke P1.
+                 * Saat P1 berubah menjadi P2, jarak juga harus
+                 * dihitung ulang berdasarkan SPBE tujuan baru.
+                 */
+                $updates['distance_km'] = null;
+
+                $updates[
+                    'distance_category'
+                ] = null;
+
+                $updates[
+                    'distance_weight'
+                ] = null;
+
+                $notes[] =
+                    'Tipe operasional berubah menjadi '
+                    . $vehicle->operational_type
+                    . '; snapshot dan profil jarak disinkronkan.';
+            }
+
+            if (
+                $operatorNameChanged
+                && !$operationalTypeChanged
+            ) {
+                $updates[
+                    'operator_name_snapshot'
+                ] = $vehicle->operator_name;
+
+                $notes[] =
+                    'Nama operator P1 disinkronkan dari Master Kendaraan.';
             }
 
             if ($notes !== []) {
@@ -468,5 +590,50 @@ class FleetVehicleService
         return $value !== ''
             ? $value
             : null;
+    }
+
+    private function nullableUppercaseString(
+        mixed $value
+    ): ?string {
+        $value =
+            $this->nullableString(
+                $value
+            );
+
+        return $value !== null
+            ? mb_strtoupper(
+                $value,
+                'UTF-8'
+            )
+            : null;
+    }
+
+    private function normalizeOperationalType(
+        mixed $value
+    ): string {
+        $value =
+            mb_strtoupper(
+                trim(
+                    (string) $value
+                ),
+                'UTF-8'
+            );
+
+        if (
+            !in_array(
+                $value,
+                [
+                    FleetVehicle::TYPE_P1,
+                    FleetVehicle::TYPE_P2,
+                ],
+                true
+            )
+        ) {
+            throw new RuntimeException(
+                'Tipe operasional kendaraan tidak valid.'
+            );
+        }
+
+        return $value;
     }
 }

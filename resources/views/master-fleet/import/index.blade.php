@@ -222,6 +222,201 @@
                                 'batch' => $batch,
                             ]
                         )
+
+                        @php
+                            $p1SheetFound = (bool) data_get(
+                                $analysis,
+                                'summary.p1_sheet_found',
+                                false
+                            );
+
+                            $officialVehicleCount = (int) data_get(
+                                $analysis,
+                                'summary.official_vehicle_count',
+                                0
+                            );
+
+                            $p1VehicleCount = (int) data_get(
+                                $analysis,
+                                'summary.p1_vehicle_count',
+                                0
+                            );
+
+                            $p2VehicleCount = (int) data_get(
+                                $analysis,
+                                'summary.p2_vehicle_count',
+                                max(
+                                    0,
+                                    $officialVehicleCount
+                                    -
+                                    $p1VehicleCount
+                                )
+                            );
+
+                            $p1DuplicatesResolved = (int) data_get(
+                                $analysis,
+                                'summary.p1_duplicates_resolved',
+                                0
+                            );
+
+                            $p1ConflictsResolved = (int) data_get(
+                                $analysis,
+                                'summary.p1_conflicts_resolved',
+                                0
+                            );
+                        @endphp
+
+                        <div
+                            class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+                        >
+                            <div
+                                class="rounded-xl border border-gray-200
+                                       bg-white p-5 shadow-sm"
+                            >
+                                <p
+                                    class="text-xs font-semibold uppercase
+                                           tracking-wide text-gray-500"
+                                >
+                                    Kendaraan Resmi
+                                </p>
+
+                                <p
+                                    class="mt-2 text-3xl font-bold
+                                           text-gray-900"
+                                >
+                                    {{
+                                        number_format(
+                                            $officialVehicleCount,
+                                            0,
+                                            ',',
+                                            '.'
+                                        )
+                                    }}
+                                </p>
+
+                                <p class="mt-1 text-xs text-gray-500">
+                                    Sumber PC SET UTAMA
+                                </p>
+                            </div>
+
+                            <div
+                                class="rounded-xl border border-indigo-200
+                                       bg-indigo-50 p-5 shadow-sm"
+                            >
+                                <p
+                                    class="text-xs font-semibold uppercase
+                                           tracking-wide text-indigo-700"
+                                >
+                                    Kendaraan P1
+                                </p>
+
+                                <p
+                                    class="mt-2 text-3xl font-bold
+                                           text-indigo-900"
+                                >
+                                    {{
+                                        number_format(
+                                            $p1VehicleCount,
+                                            0,
+                                            ',',
+                                            '.'
+                                        )
+                                    }}
+                                </p>
+
+                                <p class="mt-1 text-xs text-indigo-700">
+                                    Tujuan fleksibel, tanpa profil jarak
+                                </p>
+                            </div>
+
+                            <div
+                                class="rounded-xl border border-blue-200
+                                       bg-blue-50 p-5 shadow-sm"
+                            >
+                                <p
+                                    class="text-xs font-semibold uppercase
+                                           tracking-wide text-blue-700"
+                                >
+                                    Kendaraan P2
+                                </p>
+
+                                <p
+                                    class="mt-2 text-3xl font-bold
+                                           text-blue-900"
+                                >
+                                    {{
+                                        number_format(
+                                            $p2VehicleCount,
+                                            0,
+                                            ',',
+                                            '.'
+                                        )
+                                    }}
+                                </p>
+
+                                <p class="mt-1 text-xs text-blue-700">
+                                    SPBE tujuan tetap dan profil jarak
+                                </p>
+                            </div>
+
+                            <div
+                                class="rounded-xl border border-amber-200
+                                       bg-amber-50 p-5 shadow-sm"
+                            >
+                                <p
+                                    class="text-xs font-semibold uppercase
+                                           tracking-wide text-amber-700"
+                                >
+                                    Konflik P1 Diselesaikan
+                                </p>
+
+                                <p
+                                    class="mt-2 text-3xl font-bold
+                                           text-amber-900"
+                                >
+                                    {{
+                                        number_format(
+                                            $p1DuplicatesResolved
+                                            +
+                                            $p1ConflictsResolved,
+                                            0,
+                                            ',',
+                                            '.'
+                                        )
+                                    }}
+                                </p>
+
+                                <p class="mt-1 text-xs text-amber-700">
+                                    Mengikuti PC SET UTAMA
+                                </p>
+                            </div>
+                        </div>
+
+                        @if(!$p1SheetFound)
+                            <div
+                                class="rounded-xl border border-yellow-200
+                                       bg-yellow-50 px-5 py-4
+                                       text-sm text-yellow-900"
+                            >
+                                Sheet <strong>KENDARAAN P1</strong>
+                                tidak ditemukan. Semua kendaraan resmi
+                                akan diperlakukan sebagai P2.
+                            </div>
+                        @elseif($p1DuplicatesResolved > 0)
+                            <div
+                                class="rounded-xl border border-blue-200
+                                       bg-blue-50 px-5 py-4
+                                       text-sm text-blue-900"
+                            >
+                                Terdapat
+                                <strong>
+                                    {{ $p1DuplicatesResolved }}
+                                </strong>
+                                nopol duplikat pada sheet KENDARAAN P1.
+                                Sistem telah memilih data yang konsisten
+                                dengan PC SET UTAMA.
+                            </div>
+                        @endif
                     @endif
 
                     {{-- Judul preview sheet --}}

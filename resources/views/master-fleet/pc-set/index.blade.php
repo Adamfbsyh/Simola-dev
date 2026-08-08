@@ -16,6 +16,20 @@
 
             <div class="flex flex-wrap gap-2">
                 <a
+                    href="{{
+                        route(
+                            'master-fleet.google-workspace.index'
+                        )
+                    }}"
+                    class="inline-flex items-center justify-center
+                           rounded-lg bg-emerald-600 px-4 py-2
+                           text-sm font-semibold text-white
+                           shadow-sm hover:bg-emerald-700"
+                >
+                    Google Workspace
+                </a>
+
+                <a
                     href="{{ route('master-fleet.grouping.index') }}"
                     class="inline-flex items-center justify-center
                            rounded-lg bg-blue-600 px-4 py-2

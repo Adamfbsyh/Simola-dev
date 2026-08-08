@@ -74,6 +74,11 @@ class FleetVehicle extends Model
                 */
                 if ($vehicle->operational_type === self::TYPE_P1) {
                     $vehicle->company_id = null;
+                } else {
+                    /*
+                     * Kendaraan P2 tidak menggunakan nama operator P1.
+                     */
+                    $vehicle->operator_name = null;
                 }
             }
         );

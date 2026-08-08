@@ -102,6 +102,27 @@ class MasterFleetImportExecutionService
                         []
                     );
 
+                $p1ByPlate =
+                    data_get(
+                        $analysis,
+                        'p1.by_plate',
+                        []
+                    );
+
+                $p1Invalid =
+                    data_get(
+                        $analysis,
+                        'p1.invalid',
+                        []
+                    );
+
+                $p1MissingInFinal =
+                    data_get(
+                        $analysis,
+                        'p1.missing_in_final',
+                        []
+                    );
+
                 $finalDuplicates =
                     data_get(
                         $analysis,
@@ -162,12 +183,65 @@ class MasterFleetImportExecutionService
                     );
                 }
 
+                if (
+                    !is_array($p1ByPlate)
+                    ||
+                    !is_array($p1Invalid)
+                    ||
+                    !is_array($p1MissingInFinal)
+                ) {
+                    throw new RuntimeException(
+                        'Data analisis kendaraan P1 tidak valid.'
+                    );
+                }
+
+                if (
+                    count($p1Invalid) > 0
+                ) {
+                    throw new RuntimeException(
+                        'Sheet KENDARAAN P1 masih memiliki data invalid.'
+                    );
+                }
+
+                if (
+                    count($p1MissingInFinal) > 0
+                ) {
+                    throw new RuntimeException(
+                        'Terdapat kendaraan P1 yang tidak ada pada PC SET UTAMA.'
+                    );
+                }
+
                 $officialVehicleCount =
                     count($finalByPlate);
+
+                $officialP1Count =
+                    count($p1ByPlate);
+
+                $officialP2Count =
+                    $officialVehicleCount
+                    -
+                    $officialP1Count;
+
+                if (
+                    $officialP2Count < 0
+                ) {
+                    throw new RuntimeException(
+                        'Jumlah kendaraan P1 melebihi kendaraan resmi.'
+                    );
+                }
 
                 $statistics = [
                     'official_vehicle_count' =>
                         $officialVehicleCount,
+
+                    'p1_vehicle_count' =>
+                        $officialP1Count,
+
+                    'p2_vehicle_count' =>
+                        $officialP2Count,
+
+                    'p1_vehicles_imported' => 0,
+                    'p2_vehicles_imported' => 0,
 
                     'terminals_created' => 0,
                     'terminals_updated' => 0,
@@ -528,6 +602,54 @@ class MasterFleetImportExecutionService
                             )
                         );
 
+                    $p1Item =
+                        $p1ByPlate[
+                            $normalizedPlateNumber
+                        ]
+                        ??
+                        $p1ByPlate[
+                            $plateKey
+                        ]
+                        ??
+                        null;
+
+                    $isP1 =
+                        is_array(
+                            $p1Item
+                        );
+
+                    $operationalType =
+                        $isP1
+                            ? FleetVehicle::TYPE_P1
+                            : FleetVehicle::TYPE_P2;
+
+                    $operatorName = null;
+
+                    if ($isP1) {
+                        $operatorName =
+                            mb_strtoupper(
+                                trim(
+                                    (string) (
+                                        $p1Item[
+                                            'operator_name'
+                                        ]
+                                        ?? ''
+                                    )
+                                ),
+                                'UTF-8'
+                            );
+
+                        if ($operatorName === '') {
+                            throw new RuntimeException(
+                                'Operator kendaraan P1 kosong untuk nopol '
+                                .
+                                $plateNumber
+                                .
+                                '.'
+                            );
+                        }
+                    }
+
                     /*
                      * TLPG wajib berhasil ditemukan.
                      */
@@ -555,7 +677,8 @@ class MasterFleetImportExecutionService
                     }
 
                     /*
-                     * Perusahaan boleh kosong untuk placeholder.
+                     * Kolom perusahaan pada kendaraan P1 berisi
+                     * operator/pemilik, bukan SPBE tujuan.
                      */
                     $companyName =
                         trim(
@@ -566,6 +689,8 @@ class MasterFleetImportExecutionService
                         );
 
                     $companyPlaceholder =
+                        !$isP1
+                        &&
                         (bool) (
                             $finalItem[
                                 'company_placeholder'
@@ -576,6 +701,8 @@ class MasterFleetImportExecutionService
                     $company = null;
 
                     if (
+                        !$isP1
+                        &&
                         !$companyPlaceholder
                         &&
                         $companyName !== ''
@@ -588,11 +715,17 @@ class MasterFleetImportExecutionService
                             );
                     }
 
-                    if ($companyPlaceholder) {
+                    if (
+                        !$isP1
+                        &&
+                        $companyPlaceholder
+                    ) {
                         $statistics[
                             'company_placeholders'
                         ]++;
                     } elseif (
+                        !$isP1
+                        &&
                         $companyName !== ''
                         &&
                         $company === null
@@ -680,16 +813,31 @@ class MasterFleetImportExecutionService
                     $vehicle->plate_number =
                         $plateNumber;
 
-                    /*
-                     * Data manual yang telah diperbaiki tidak dihapus
-                     * oleh placeholder atau nama perusahaan yang gagal cocok.
-                     */
-                    if ($company !== null) {
-                        $vehicle->company_id =
-                            $company->id;
-                    } elseif ($created) {
+                    $vehicle->operational_type =
+                        $operationalType;
+
+                    $vehicle->operator_name =
+                        $operatorName;
+
+                    if ($isP1) {
+                        /*
+                         * P1 tidak mempunyai SPBE tujuan tetap.
+                         */
                         $vehicle->company_id =
                             null;
+                    } else {
+                        /*
+                         * Data manual P2 yang telah diperbaiki tidak
+                         * dihapus oleh placeholder atau nama perusahaan
+                         * yang gagal cocok.
+                         */
+                        if ($company !== null) {
+                            $vehicle->company_id =
+                                $company->id;
+                        } elseif ($created) {
+                            $vehicle->company_id =
+                                null;
+                        }
                     }
 
                     if (
@@ -716,6 +864,16 @@ class MasterFleetImportExecutionService
                     } else {
                         $statistics[
                             'vehicles_updated'
+                        ]++;
+                    }
+
+                    if ($isP1) {
+                        $statistics[
+                            'p1_vehicles_imported'
+                        ]++;
+                    } else {
+                        $statistics[
+                            'p2_vehicles_imported'
                         ]++;
                     }
 
@@ -762,7 +920,10 @@ class MasterFleetImportExecutionService
                         }
                     }
 
-                    if ($companyPlaceholder) {
+                    if ($isP1) {
+                        $validationNotes[] =
+                            'Kendaraan P1 dengan tujuan fleksibel; profil jarak tidak diperlukan.';
+                    } elseif ($companyPlaceholder) {
                         $validationStatus =
                             'company_pending';
 
@@ -789,10 +950,18 @@ class MasterFleetImportExecutionService
                                 $vehicle->id,
 
                             'company_id' =>
-                                $company?->id,
+                                $isP1
+                                    ? null
+                                    : $company?->id,
 
                             'terminal_id' =>
                                 $terminal->id,
+
+                            'operational_type' =>
+                                $operationalType,
+
+                            'operator_name_snapshot' =>
+                                $operatorName,
 
                             'pc_initial' =>
                                 $pcInitial,
@@ -807,6 +976,8 @@ class MasterFleetImportExecutionService
                                 $plateNumber,
 
                             'company_name_snapshot' =>
+                                !$isP1
+                                &&
                                 $companyName !== ''
                                     ? $companyName
                                     : null,
@@ -853,7 +1024,11 @@ class MasterFleetImportExecutionService
                     /*
                      * Hubungan perusahaan dan TLPG.
                      */
-                    if ($company !== null) {
+                    if (
+                        !$isP1
+                        &&
+                        $company !== null
+                    ) {
                         $pairKey =
                             $company->id
                             .
@@ -1080,6 +1255,53 @@ class MasterFleetImportExecutionService
                             '.'
                         );
                     }
+                }
+
+                $savedP1AssignmentCount =
+                    FleetGroupingAssignment::query()
+                        ->where(
+                            'grouping_period_id',
+                            $groupingPeriod->id
+                        )
+                        ->where(
+                            'operational_type',
+                            FleetVehicle::TYPE_P1
+                        )
+                        ->count();
+
+                if (
+                    $savedP1AssignmentCount
+                    !==
+                    $officialP1Count
+                ) {
+                    throw new RuntimeException(
+                        'Jumlah assignment P1 tidak sesuai. '
+                        .
+                        'Seharusnya '
+                        .
+                        $officialP1Count
+                        .
+                        ', tersimpan '
+                        .
+                        $savedP1AssignmentCount
+                        .
+                        '.'
+                    );
+                }
+
+                $savedP2AssignmentCount =
+                    $assignmentCount
+                    -
+                    $savedP1AssignmentCount;
+
+                if (
+                    $savedP2AssignmentCount
+                    !==
+                    $officialP2Count
+                ) {
+                    throw new RuntimeException(
+                        'Jumlah assignment P2 tidak sesuai.'
+                    );
                 }
 
                 ksort(

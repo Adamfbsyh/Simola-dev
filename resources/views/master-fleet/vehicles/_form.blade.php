@@ -1,8 +1,16 @@
 @php
     $editing = $vehicle->exists;
+    $selectedOperationalType = old(
+        'operational_type',
+        $vehicle->operational_type
+            ?: \App\Models\FleetVehicle::TYPE_P2
+    );
 @endphp
 
-<div class="grid gap-5 md:grid-cols-2">
+<div
+    class="grid gap-5 md:grid-cols-2"
+    data-operational-vehicle-form
+>
     <div>
         <label
             for="plate-number"
@@ -30,10 +38,72 @@
 
     <div>
         <label
+            for="operational-type"
+            class="mb-2 block text-sm font-semibold text-gray-700"
+        >
+            Tipe Operasional
+        </label>
+
+        <select
+            id="operational-type"
+            name="operational_type"
+            required
+            class="w-full rounded-lg border-gray-300 shadow-sm
+                   focus:border-blue-500 focus:ring-blue-500"
+            data-operational-type
+        >
+            <option
+                value="P2"
+                @selected($selectedOperationalType === 'P2')
+            >
+                P2 — SPBE Tujuan Tetap
+            </option>
+            <option
+                value="P1"
+                @selected($selectedOperationalType === 'P1')
+            >
+                P1 — Tujuan Fleksibel
+            </option>
+        </select>
+
+        <p class="mt-1 text-xs text-gray-500">
+            P1 memakai nama operator/pemilik. P2 memakai SPBE tujuan
+            dan profil jarak.
+        </p>
+    </div>
+
+    <div data-p1-fields>
+        <label
+            for="operator-name"
+            class="mb-2 block text-sm font-semibold text-gray-700"
+        >
+            Operator / Pemilik P1
+        </label>
+
+        <input
+            id="operator-name"
+            type="text"
+            name="operator_name"
+            maxlength="255"
+            value="{{ old('operator_name', $vehicle->operator_name) }}"
+            placeholder="Contoh: PT PATRA NIAGA"
+            class="w-full rounded-lg border-gray-300 uppercase
+                   shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            data-operator-name
+        >
+
+        <p class="mt-1 text-xs text-gray-500">
+            Wajib untuk kendaraan P1. Kendaraan P1 tidak memerlukan
+            SPBE tujuan dan tidak dihitung sebagai jarak belum lengkap.
+        </p>
+    </div>
+
+    <div data-p2-fields>
+        <label
             for="company-search"
             class="mb-2 block text-sm font-semibold text-gray-700"
         >
-            SPBE / Perusahaan
+            SPBE Tujuan P2
         </label>
 
         <div
@@ -128,8 +198,8 @@
 
         @if($editing)
             <p class="mt-1 text-xs text-orange-600">
-                Perubahan perusahaan akan mengosongkan profil
-                jarak pada PC Set aktif dan draft agar dihitung ulang.
+                Perubahan tipe operasional atau SPBE tujuan akan
+                mengosongkan profil jarak pada PC Set aktif dan draft.
             </p>
         @endif
     </div>
@@ -313,6 +383,88 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        const operationalForms =
+            document.querySelectorAll(
+                '[data-operational-vehicle-form]'
+            );
+
+        operationalForms.forEach(function (form) {
+            const typeSelect =
+                form.querySelector(
+                    '[data-operational-type]'
+                );
+
+            const p1Fields =
+                form.querySelector(
+                    '[data-p1-fields]'
+                );
+
+            const p2Fields =
+                form.querySelector(
+                    '[data-p2-fields]'
+                );
+
+            const operatorInput =
+                form.querySelector(
+                    '[data-operator-name]'
+                );
+
+            const companySelect =
+                form.querySelector(
+                    '[data-company-select]'
+                );
+
+            const companySearch =
+                form.querySelector(
+                    '[data-company-search]'
+                );
+
+            if (!typeSelect) {
+                return;
+            }
+
+            const syncOperationalFields =
+                function () {
+                    const isP1 =
+                        typeSelect.value === 'P1';
+
+                    if (p1Fields) {
+                        p1Fields.classList.toggle(
+                            'hidden',
+                            !isP1
+                        );
+                    }
+
+                    if (p2Fields) {
+                        p2Fields.classList.toggle(
+                            'hidden',
+                            isP1
+                        );
+                    }
+
+                    if (operatorInput) {
+                        operatorInput.disabled = !isP1;
+                        operatorInput.required = isP1;
+                    }
+
+                    if (companySelect) {
+                        companySelect.disabled = isP1;
+                        companySelect.required = !isP1;
+                    }
+
+                    if (companySearch) {
+                        companySearch.disabled = isP1;
+                    }
+                };
+
+            typeSelect.addEventListener(
+                'change',
+                syncOperationalFields
+            );
+
+            syncOperationalFields();
+        });
+
         const wrappers =
             document.querySelectorAll(
                 '[data-company-filter-wrapper]'
