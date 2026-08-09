@@ -348,4 +348,5 @@
             </div>
         </div>
     </div>
+    @include('layouts.partials.simola-nav-dropdown-enhancer')
 </nav>

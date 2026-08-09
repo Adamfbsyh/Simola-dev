@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureMonitoringPermission;
+use App\Http\Middleware\AuditMasterFleetChanges;
 use App\Http\Middleware\EnsureUserIsActive;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -28,6 +29,7 @@ return Application::configure(
                 'web',
                 [
                     EnsureUserIsActive::class,
+                                    AuditMasterFleetChanges::class,
                 ]
             );
 

@@ -1,4 +1,5 @@
 <x-app-layout>
+    @include('master-fleet.partials.fleet-type-selector')
     <x-slot name="header">
         <div
             class="flex flex-col justify-between gap-3

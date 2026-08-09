@@ -3,7 +3,7 @@
         <div class="flex items-center justify-between gap-4">
             <div>
                 <h2 class="text-xl font-bold text-gray-900">
-                    Master SPBE / Perusahaan
+                    Master {{ \App\Support\MasterFleet\FleetType::current(request()) === \App\Support\MasterFleet\FleetType::PERTASHOP ? 'SPBU / Perusahaan' : 'SPBE / Perusahaan' }}
                 </h2>
 
                 <p class="mt-1 text-sm text-gray-500">

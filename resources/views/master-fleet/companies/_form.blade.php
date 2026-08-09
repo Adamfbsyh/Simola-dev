@@ -32,7 +32,7 @@
 
     <div>
         <label class="mb-2 block text-sm font-semibold text-gray-700">
-            Nama SPBE / Perusahaan
+            Nama {{ \App\Support\MasterFleet\FleetType::current(request()) === \App\Support\MasterFleet\FleetType::PERTASHOP ? 'SPBU / Perusahaan' : 'SPBE / Perusahaan' }}
         </label>
 
         <input

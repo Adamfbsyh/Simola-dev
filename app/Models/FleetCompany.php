@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasFleetType;
+
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -10,7 +12,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class FleetCompany extends Model
 {
-    use HasFactory;
+        use HasFleetType;
+use HasFactory;
 
     protected $fillable = [
         'code',

@@ -1,4 +1,7 @@
 <x-app-layout>
+    @include('master-fleet.partials.fleet-type-selector')
+
+    @include('master-fleet.compare.entry')
     <x-slot name="header">
         <div>
             <h2 class="text-xl font-bold text-gray-900">

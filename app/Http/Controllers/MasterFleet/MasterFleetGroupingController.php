@@ -91,6 +91,25 @@ class MasterFleetGroupingController extends Controller
                 ->orderByDesc('id')
                 ->first();
 
+        // SIMOLA PC AUTOSYNC V3: operator count aktif.
+        // Draft menjadi sumber utama. Ini memperbaiki nilai default 12
+        // yang sebelumnya dihitung sebelum $draft/$published tersedia.
+        $operatorCount = max(
+            1,
+            min(
+                50,
+                (int) (
+                    $draft?->operator_count
+                    ??
+                    $published?->operator_count
+                    ??
+                    config(
+                        'master-fleet.operator_count',
+                        12
+                    )
+                )
+            )
+        );
         /*
         |--------------------------------------------------------------------------
         | Nilai awal untuk view
@@ -719,11 +738,19 @@ class MasterFleetGroupingController extends Controller
     ): RedirectResponse {
         $operatorCount = max(
             1,
-            (int) config(
-                'master-fleet.operator_count',
-                12
+            min(
+                50,
+                (int) (
+                    $period->operator_count
+                    ??
+                    config(
+                        'master-fleet.operator_count',
+                        12
+                    )
+                )
             )
         );
+        // SIMOLA PC AUTOSYNC V3: validasi mengikuti draft
 
         $validated =
             $request->validate([
@@ -794,11 +821,19 @@ class MasterFleetGroupingController extends Controller
     ): RedirectResponse {
         $operatorCount = max(
             1,
-            (int) config(
-                'master-fleet.operator_count',
-                12
+            min(
+                50,
+                (int) (
+                    $period->operator_count
+                    ??
+                    config(
+                        'master-fleet.operator_count',
+                        12
+                    )
+                )
             )
         );
+        // SIMOLA PC AUTOSYNC V3: validasi mengikuti draft
 
         $validated =
             $request->validate([
@@ -885,13 +920,37 @@ class MasterFleetGroupingController extends Controller
             ]);
 
         try {
-            $updatedPeriod =
-                $service->updateOperatorCount(
-                    period: $period,
-                    operatorCount:
-                        (int) $validated[
-                            'operator_count'
-                        ]
+            // SIMOLA PC AUTOSYNC V3: save + generate.
+            // Penambahan jumlah PC langsung diikuti generate ulang
+            // tanpa perlu memilih kendaraan satu per satu.
+            [$updatedPeriod, $result] =
+                DB::transaction(
+                    function () use (
+                        $period,
+                        $service,
+                        $validated
+                    ): array {
+                        $updatedPeriod =
+                            $service->updateOperatorCount(
+                                period: $period,
+                                operatorCount:
+                                    (int) $validated[
+                                        'operator_count'
+                                    ]
+                            );
+
+                        $result =
+                            $service->generate(
+                                period: $updatedPeriod,
+                                preserveManual: true
+                            );
+
+                        return [
+                            $updatedPeriod,
+                            $result,
+                        ];
+                    },
+                    3
                 );
 
             return redirect()
@@ -903,12 +962,19 @@ class MasterFleetGroupingController extends Controller
                 )
                 ->with(
                     'success',
-                    'Jumlah PC berhasil diubah menjadi '
+                    'Jumlah PC berhasil menjadi '
                     .
                     $updatedPeriod->operator_count
                     .
-                    '. Jalankan Generate PC Final agar pembagian '
-                    . 'menyesuaikan jumlah PC terbaru.'
+                    '. Pembagian PC Final otomatis disinkronkan: '
+                    .
+                    $result['generated']
+                    .
+                    ' kendaraan digenerate ulang dan '
+                    .
+                    $result['manual_preserved']
+                    .
+                    ' edit manual dipertahankan.'
                 );
         } catch (Throwable $e) {
             report($e);
@@ -919,7 +985,7 @@ class MasterFleetGroupingController extends Controller
                     'error',
                     app()->isLocal()
                         ? $e->getMessage()
-                        : 'Jumlah PC gagal diperbarui.'
+                        : 'Jumlah PC gagal diperbarui dan disinkronkan.'
                 );
         }
     }

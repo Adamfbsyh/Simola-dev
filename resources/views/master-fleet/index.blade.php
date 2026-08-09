@@ -1,4 +1,7 @@
 <x-app-layout>
+    @include('master-fleet.partials.fleet-type-selector')
+
+    @include('master-fleet.partials.master-data-scope-note')
     <x-slot name="header">
         <div>
             <h2 class="text-xl font-bold text-gray-900">
@@ -35,7 +38,7 @@
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <div class="rounded-xl border bg-white p-5 shadow-sm">
                     <p class="text-sm text-gray-500">
-                        TLPG / Terminal Aktif
+                        TLPG / Terminal Aktif · Bersama
                     </p>
 
                     <p class="mt-2 text-3xl font-bold text-gray-900">
@@ -49,8 +52,8 @@
 
                 <div class="rounded-xl border bg-white p-5 shadow-sm">
                     <p class="text-sm text-gray-500">
-                        SPBE / Perusahaan Aktif
-                    </p>
+                {{ \App\Support\MasterFleet\FleetType::current(request()) === \App\Support\MasterFleet\FleetType::PERTASHOP ? 'SPBU / Perusahaan Aktif' : 'SPBE / Perusahaan Aktif' }}
+            </p>
 
                     <p class="mt-2 text-3xl font-bold text-gray-900">
                         {{ $activeCompanyCount }}
@@ -119,7 +122,7 @@
                            transition hover:-translate-y-1 hover:shadow-md"
                 >
                     <h3 class="text-lg font-bold text-gray-900">
-                        Master SPBE / Perusahaan
+                        {{ \App\Support\MasterFleet\FleetType::current(request()) === \App\Support\MasterFleet\FleetType::PERTASHOP ? 'Master SPBU / Perusahaan' : 'Master SPBE / Perusahaan' }}
                     </h3>
 
                     <p class="mt-2 text-sm leading-6 text-gray-500">

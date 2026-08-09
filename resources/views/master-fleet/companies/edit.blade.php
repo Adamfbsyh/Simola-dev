@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
         <h2 class="text-xl font-bold text-gray-900">
-            Edit SPBE / Perusahaan
+            Edit {{ \App\Support\MasterFleet\FleetType::current(request()) === \App\Support\MasterFleet\FleetType::PERTASHOP ? 'SPBU / Perusahaan' : 'SPBE / Perusahaan' }}
         </h2>
     </x-slot>
 

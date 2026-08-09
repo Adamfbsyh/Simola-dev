@@ -952,3 +952,15 @@ if (config('master-fleet.enabled')) {
         });
     }
 require __DIR__ . '/auth.php';
+
+// SIMOLA ERRORLOG MONTHLY INSTALLER
+require __DIR__ . '/errorlog-monthly.php';
+
+/* SIMOLA FLEET TYPE V1 */
+require __DIR__ . '/fleet-type.php';
+
+/* SIMOLA MASTER FLEET AUDIT V1 */
+require __DIR__ . '/master-fleet-audit.php';
+
+/* SIMOLA COMPARE IMPORT EXCEL V1 */
+require __DIR__ . '/master-fleet-compare.php';

@@ -9,6 +9,7 @@ use App\Models\FleetGroupingPeriod;
 use App\Models\FleetImportBatch;
 use App\Models\FleetTerminal;
 use App\Models\FleetVehicle;
+use App\Support\MasterFleet\FleetType;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -27,13 +28,18 @@ class MasterFleetImportExecutionService
         string $effectiveDate,
         bool $syncSnapshot = true
     ): array {
+        // SIMOLA FLEET TYPE IMPORT V1
+        $fleetType =
+            FleetType::current();
+
         return DB::transaction(
             function () use (
                 $batch,
                 $userId,
                 $groupingName,
                 $effectiveDate,
-                $syncSnapshot
+                $syncSnapshot,
+                $fleetType
             ): array {
                 /*
                 |--------------------------------------------------------------------------
@@ -377,7 +383,7 @@ class MasterFleetImportExecutionService
                  * TLPG yang tidak ada pada workbook dinonaktifkan,
                  * bukan dihapus.
                  */
-                if ($syncSnapshot) {
+                if ($syncSnapshot && $fleetType === FleetType::LPG) {
                     $statistics[
                         'terminals_deactivated'
                     ] =
@@ -489,7 +495,7 @@ class MasterFleetImportExecutionService
                         $company->normalized_name;
                 }
 
-                if ($syncSnapshot) {
+                if ($syncSnapshot && $fleetType === FleetType::LPG) {
                     $statistics[
                         'companies_deactivated'
                     ] =
@@ -522,6 +528,10 @@ class MasterFleetImportExecutionService
                         'status',
                         'published'
                     )
+                    ->where(
+                        'fleet_type',
+                        $fleetType
+                    )
                     ->update([
                         'status' => 'archived',
                     ]);
@@ -531,6 +541,9 @@ class MasterFleetImportExecutionService
                         ->create([
                             'import_batch_id' =>
                                 $lockedBatch->id,
+
+                            'fleet_type' =>
+                                $fleetType,
 
                             'name' =>
                                 trim($groupingName),
@@ -855,6 +868,9 @@ class MasterFleetImportExecutionService
                     $vehicle->is_active =
                         true;
 
+                    $vehicle->fleet_type =
+                        $fleetType;
+
                     $vehicle->save();
 
                     if ($created) {
@@ -1160,6 +1176,10 @@ class MasterFleetImportExecutionService
                         'vehicles_deactivated'
                     ] =
                         FleetVehicle::query()
+                            ->where(
+                                'fleet_type',
+                                $fleetType
+                            )
                             ->whereNotIn(
                                 'normalized_plate_number',
                                 $officialPlateNumbers
@@ -1213,6 +1233,10 @@ class MasterFleetImportExecutionService
 
                 $activeOfficialCount =
                     FleetVehicle::query()
+                        ->where(
+                            'fleet_type',
+                            $fleetType
+                        )
                         ->whereIn(
                             'normalized_plate_number',
                             $officialPlateNumbers
@@ -1236,6 +1260,10 @@ class MasterFleetImportExecutionService
                 if ($syncSnapshot) {
                     $totalActiveVehicleCount =
                         FleetVehicle::query()
+                            ->where(
+                                'fleet_type',
+                                $fleetType
+                            )
                             ->where(
                                 'is_active',
                                 true

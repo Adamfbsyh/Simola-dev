@@ -16,6 +16,16 @@
             </div>
 
             <div class="flex flex-wrap gap-2">
+                {{-- SIMOLA ERRORLOG MONTHLY LINK --}}
+                <a
+                    href="{{ route('master-fleet.errorlog-monthly.index') }}"
+                    class="inline-flex items-center justify-center
+                           rounded-lg border border-indigo-200 bg-indigo-50
+                           px-4 py-2 text-sm font-semibold text-indigo-700
+                           shadow-sm hover:bg-indigo-100"
+                >
+                    Error Log Bulanan
+                </a>
                 <a
                     href="{{ route('master-fleet.pc-set.index') }}"
                     class="inline-flex items-center justify-center
