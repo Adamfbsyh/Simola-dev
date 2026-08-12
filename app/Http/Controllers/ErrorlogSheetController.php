@@ -94,7 +94,10 @@ class ErrorlogSheetController extends Controller
         );
 
         try {
-            $stats = $service->sync($source);
+            $stats = $service->sync(
+                $request->user(),
+                $source
+            );
 
             return redirect()
                 ->route('errorlog-sheet.index')
@@ -127,6 +130,7 @@ class ErrorlogSheetController extends Controller
     }
 
     public function sync(
+        Request $request,
         ErrorlogSheetSource $source,
         GoogleErrorlogSyncService $service
     ) {
@@ -136,7 +140,10 @@ class ErrorlogSheetController extends Controller
                 'last_error' => null,
             ]);
 
-            $stats = $service->sync($source);
+            $stats = $service->sync(
+                $request->user(),
+                $source
+            );
 
             return back()->with(
                 'success',

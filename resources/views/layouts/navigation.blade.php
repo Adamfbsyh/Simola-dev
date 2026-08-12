@@ -25,8 +25,7 @@
 
 <nav
     x-data="{ open: false }"
-    class="bg-white border-b border-gray-100"
->
+    class="bg-white border-b border-gray-100 simola-navbar-surface">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-16">
             <div class="flex">
@@ -102,12 +101,20 @@
                             >
                                 Master Fleet
                             </x-nav-link>
-                        @endcan
+<!-- SIMOLA_OPERATOR_CHAT_TOP_DEVICE_V20_START -->
+                    <x-operator-chat-nav-link />
+                    <!-- SIMOLA_OPERATOR_CHAT_TOP_DEVICE_V20_END -->
+
+@endcan
                     @endif
                 </div>
             </div>
 
-            <div class="hidden sm:flex sm:items-center sm:ms-6">
+            
+                <div class="hidden sm:flex sm:items-center sm:ms-4">
+                    @include('layouts.partials.theme-toggle')
+                </div>
+<div class="hidden sm:flex sm:items-center sm:ms-6">
                 <x-dropdown
                     align="right"
                     width="48"
@@ -231,6 +238,13 @@
         }"
         class="hidden sm:hidden"
     >
+        <!-- Mobile theme toggle -->
+        <div class="border-t border-gray-200 pb-3 pt-3 sm:hidden">
+            <div class="px-4">
+                @include('layouts.partials.theme-toggle')
+            </div>
+        </div>
+
         <div class="pt-2 pb-3 space-y-1">
             @can('dashboard.view')
                 <x-responsive-nav-link

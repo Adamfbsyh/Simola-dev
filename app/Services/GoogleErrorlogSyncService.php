@@ -4,8 +4,9 @@ namespace App\Services;
 
 use App\Models\ErrorlogSheetSource;
 use App\Models\MonitoringEvent;
+use App\Models\User;
 use Carbon\Carbon;
-use Google\Client as GoogleClient;
+use App\Services\MasterFleet\MasterFleetGoogleWorkspaceService;
 use Google\Service\Sheets as GoogleSheets;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -14,51 +15,20 @@ class GoogleErrorlogSyncService
 {
     private GoogleSheets $sheets;
 
-    public function __construct()
-    {
-        $configuredPath = config(
-            'services.google_sheets.credentials'
-        );
-
-        if (!$configuredPath) {
-            throw new RuntimeException(
-                'Lokasi credential Google Sheets belum dikonfigurasi.'
-            );
-        }
-
-        $credentialsPath = $this->resolvePath(
-            $configuredPath
-        );
-
-        if (!is_file($credentialsPath)) {
-            throw new RuntimeException(
-                'File service-account.json tidak ditemukan di: ' .
-                $credentialsPath
-            );
-        }
-
-        $client = new GoogleClient();
-
-        $client->setApplicationName(
-            'SIMOLA Errorlog Sync'
-        );
-
-        $client->setAuthConfig(
-            $credentialsPath
-        );
-
-        $client->setScopes([
-            GoogleSheets::SPREADSHEETS_READONLY,
-        ]);
-
-        $this->sheets = new GoogleSheets(
-            $client
-        );
+    public function __construct(
+        private MasterFleetGoogleWorkspaceService $workspace
+    ) {
     }
 
     public function sync(
+        User $user,
         ErrorlogSheetSource $source
     ): array {
+        $this->sheets =
+            $this->workspace
+                ->sheetsForK302(
+                    $user
+                );
         /*
          * Nama tab akan diperiksa terlebih dahulu.
          *

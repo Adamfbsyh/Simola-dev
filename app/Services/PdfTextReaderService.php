@@ -95,45 +95,24 @@ class PdfTextReaderService
      * 1. smalot/pdfparser jika sudah terpasang;
      * 2. pdftotext/Poppler.
      */
-    public function readPdf(
+        public function readPdf(
         string $pdfPath
     ): string {
         if (
             !is_file($pdfPath)
             ||
-            strtolower(
-                pathinfo(
-                    $pdfPath,
-                    PATHINFO_EXTENSION
-                )
-            ) !== 'pdf'
+            strtolower(pathinfo($pdfPath, PATHINFO_EXTENSION)) !== 'pdf'
         ) {
             return '';
         }
 
         /*
-        |--------------------------------------------------------------------------
-        | Coba Smalot PDF Parser
-        |--------------------------------------------------------------------------
-        */
-
-        $smalotText = $this->readUsingSmalot(
-            $pdfPath
-        );
-
-        if ($smalotText !== '') {
-            return $smalotText;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Coba pdftotext / Poppler
-        |--------------------------------------------------------------------------
-        */
-
-        return $this->readUsingPdftotext(
-            $pdfPath
-        );
+         * Jangan menjalankan smalot/pdfparser di request HTTP utama.
+         * PDF malformed/kompleks dapat menghabiskan seluruh memory PHP.
+         * pdftotext berjalan sebagai proses eksternal sehingga memory-nya
+         * terisolasi dari proses Laravel.
+         */
+        return $this->readUsingPdftotext($pdfPath);
     }
 
     /**
@@ -228,136 +207,88 @@ class PdfTextReaderService
         return null;
     }
 
-    /**
-     * Membaca PDF menggunakan smalot/pdfparser jika tersedia.
-     */
-    private function readUsingSmalot(
-        string $pdfPath
-    ): string {
-        if (
-            !class_exists(
-                \Smalot\PdfParser\Parser::class
-            )
-        ) {
-            return '';
-        }
+    
 
-        try {
-            $parser = new \Smalot\PdfParser\Parser();
-
-            $pdf = $parser->parseFile(
-                $pdfPath
-            );
-
-            return $this->normalizeText(
-                $pdf->getText()
-            );
-        } catch (Throwable $e) {
-            report($e);
-
-            return '';
-        }
-    }
 
     /**
      * Membaca PDF menggunakan pdftotext.
      */
-    private function readUsingPdftotext(
+        private function readUsingPdftotext(
         string $pdfPath
     ): string {
         $binary = $this->resolvePdftotextBinary();
 
         if (!$binary) {
+            report(new RuntimeException(
+                'pdftotext tidak ditemukan. PDF dilewati agar request Laravel tetap aman.'
+            ));
             return '';
         }
 
-        $command = [
-            $binary,
-            '-layout',
-            '-enc',
-            'UTF-8',
-            $pdfPath,
-            '-',
-        ];
+        $maxFileBytes = max(1048576, (int) env('PDFTOTEXT_MAX_FILE_BYTES', 67108864));
+        $fileSize = @filesize($pdfPath);
+        if (is_int($fileSize) && $fileSize > $maxFileBytes) {
+            report(new RuntimeException(
+                'PDF terlalu besar untuk diproses: '.basename($pdfPath).' ('.$fileSize.' bytes)'
+            ));
+            return '';
+        }
 
-        $descriptorSpec = [
-            0 => [
-                'pipe',
-                'r',
-            ],
-
-            1 => [
-                'pipe',
-                'w',
-            ],
-
-            2 => [
-                'pipe',
-                'w',
-            ],
-        ];
+        $timeoutSeconds = max(5, (int) env('PDFTOTEXT_TIMEOUT_SECONDS', 30));
+        $maxOutputBytes = max(1048576, (int) env('PDFTOTEXT_MAX_OUTPUT_BYTES', 16777216));
+        $maxStderrBytes = 1048576;
+        $command = [$binary, '-layout', '-enc', 'UTF-8', $pdfPath, '-'];
+        $descriptorSpec = [0=>['pipe','r'],1=>['pipe','w'],2=>['pipe','w']];
+        $process = null; $pipes = [];
 
         try {
-            $process = @proc_open(
-                $command,
-                $descriptorSpec,
-                $pipes,
-                dirname($pdfPath)
-            );
-
-            if (!is_resource($process)) {
-                return '';
-            }
-
+            $process = @proc_open($command, $descriptorSpec, $pipes, dirname($pdfPath), null, ['bypass_shell'=>true]);
+            if (!is_resource($process)) return '';
             fclose($pipes[0]);
+            stream_set_blocking($pipes[1], false); stream_set_blocking($pipes[2], false);
+            $stdout=''; $stderr=''; $startedAt=microtime(true); $timedOut=false; $tooLarge=false; $lastStatus=null;
 
-            $stdout = stream_get_contents(
-                $pipes[1]
-            );
+            $drain = static function ($stream, string &$buffer, int $limit, bool &$limitReached): void {
+                while (is_resource($stream) && !feof($stream)) {
+                    $remaining=$limit-strlen($buffer);
+                    if($remaining<=0){$limitReached=true;return;}
+                    $chunk=fread($stream,min(8192,$remaining));
+                    if($chunk===false||$chunk==='') return;
+                    $buffer.=$chunk;
+                }
+            };
 
-            fclose($pipes[1]);
-
-            $stderr = stream_get_contents(
-                $pipes[2]
-            );
-
-            fclose($pipes[2]);
-
-            $exitCode = proc_close(
-                $process
-            );
-
-            $text = $this->normalizeText(
-                $stdout
-            );
-
-            /*
-             * Beberapa versi pdftotext dapat mengembalikan
-             * warning tetapi teks tetap berhasil dibuat.
-             */
-            if ($text !== '') {
-                return $text;
+            while (true) {
+                $drain($pipes[1],$stdout,$maxOutputBytes,$tooLarge);
+                $stderrTooLarge=false; $drain($pipes[2],$stderr,$maxStderrBytes,$stderrTooLarge);
+                if($tooLarge){@proc_terminate($process);break;}
+                $lastStatus=proc_get_status($process);
+                if(!is_array($lastStatus)||!($lastStatus['running']??false)) break;
+                if(microtime(true)-$startedAt>$timeoutSeconds){$timedOut=true;@proc_terminate($process);break;}
+                usleep(20000);
             }
 
-            if (
-                $exitCode !== 0
-                &&
-                trim((string) $stderr) !== ''
-            ) {
-                report(
-                    new RuntimeException(
-                        'pdftotext gagal membaca ' .
-                        basename($pdfPath) .
-                        ': ' .
-                        trim((string) $stderr)
-                    )
-                );
-            }
+            $drain($pipes[1],$stdout,$maxOutputBytes,$tooLarge);
+            $stderrTooLarge=false; $drain($pipes[2],$stderr,$maxStderrBytes,$stderrTooLarge);
+            if(is_resource($pipes[1])) fclose($pipes[1]); if(is_resource($pipes[2])) fclose($pipes[2]);
+            $closeCode=proc_close($process); $process=null;
 
+            if($timedOut){ report(new RuntimeException('pdftotext timeout setelah '.$timeoutSeconds.' detik: '.basename($pdfPath))); return ''; }
+            if($tooLarge){ report(new RuntimeException('Output pdftotext melewati batas '.$maxOutputBytes.' bytes: '.basename($pdfPath))); return ''; }
+
+            $text=$this->normalizeText($stdout);
+            if($text!=='') return $text;
+
+            $exitCode=is_array($lastStatus)&&isset($lastStatus['exitcode'])&&(int)$lastStatus['exitcode']>=0 ? (int)$lastStatus['exitcode'] : $closeCode;
+            if($exitCode!==0 && trim($stderr)!==''){
+                report(new RuntimeException('pdftotext gagal membaca '.basename($pdfPath).': '.mb_substr(trim($stderr),0,2000)));
+            }
             return '';
         } catch (Throwable $e) {
             report($e);
-
+            if(is_resource($process)) @proc_terminate($process);
+            foreach($pipes as $pipe) if(is_resource($pipe)) @fclose($pipe);
+            if(is_resource($process)) @proc_close($process);
             return '';
         }
     }

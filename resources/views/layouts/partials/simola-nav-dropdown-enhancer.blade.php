@@ -8,118 +8,95 @@ document.addEventListener('DOMContentLoaded', function () {
 
     nav.dataset.simolaGroupedNav = '1';
 
-    const normalizeText = (value) =>
+    const normalize = (value) =>
         String(value || '')
             .replace(/\s+/g, ' ')
             .trim()
             .toLowerCase();
 
-    const allLinks = Array.from(nav.querySelectorAll('a'));
+    const links = Array.from(nav.querySelectorAll('a'));
 
-    const findLinks = (label) =>
-        allLinks.filter((link) => normalizeText(link.textContent) === normalizeText(label));
+    const find = (label) =>
+        links.filter((link) => normalize(link.textContent) === normalize(label));
 
-    const sameParentPairs = (firstLinks, secondLinks) => {
-        const pairs = [];
-
-        firstLinks.forEach((first) => {
-            const second = secondLinks.find((candidate) => candidate.parentElement === first.parentElement);
-
-            if (second) {
-                pairs.push([first, second]);
-            }
-        });
-
-        return pairs;
-    };
-
-    const looksLikeDesktopContainer = (element) => {
-        if (!element) {
-            return false;
-        }
-
-        const className = String(element.className || '');
-
-        return (
-            className.includes('sm:flex') ||
-            className.includes('md:flex') ||
-            className.includes('lg:flex') ||
-            className.includes('space-x') ||
-            className.includes('gap-')
-        );
-    };
-
-    const isCurrentLink = (link) => {
+    const isCurrent = (link) => {
         if (!link || !link.href) {
             return false;
         }
 
         try {
             const target = new URL(link.href, window.location.origin);
-            const currentPath = window.location.pathname.replace(/\/+$/, '') || '/';
-            const targetPath = target.pathname.replace(/\/+$/, '') || '/';
+            const current = window.location.pathname.replace(/\/+$/, '') || '/';
+            const path = target.pathname.replace(/\/+$/, '') || '/';
 
-            return (
-                currentPath === targetPath ||
-                link.getAttribute('aria-current') === 'page'
-            );
+            return current === path || link.getAttribute('aria-current') === 'page';
         } catch (error) {
             return false;
         }
     };
 
-    const closeAllDropdowns = (exceptWrapper) => {
-        nav.querySelectorAll('[data-simola-nav-menu]').forEach((menu) => {
-            const wrapper = menu.closest('[data-simola-nav-wrapper]');
+    const desktopContainer = (element) => {
+        if (!element) {
+            return false;
+        }
 
-            if (exceptWrapper && wrapper === exceptWrapper) {
+        const classes = String(element.className || '');
+
+        return (
+            classes.includes('sm:flex') ||
+            classes.includes('md:flex') ||
+            classes.includes('lg:flex') ||
+            classes.includes('space-x') ||
+            classes.includes('gap-')
+        );
+    };
+
+    const close = (except = null) => {
+        nav.querySelectorAll('[data-simola-nav-wrapper]').forEach((wrapper) => {
+            if (wrapper === except) {
                 return;
             }
 
-            menu.classList.add('hidden');
+            const menu = wrapper.querySelector('[data-simola-nav-menu]');
+            const button = wrapper.querySelector('[data-simola-nav-button]');
 
-            const button = wrapper
-                ? wrapper.querySelector('[data-simola-nav-button]')
-                : null;
+            if (menu) {
+                menu.classList.add('hidden');
+            }
 
             if (button) {
                 button.setAttribute('aria-expanded', 'false');
+
+                const caret = button.querySelector('[data-simola-nav-caret]');
+                caret?.classList.remove('rotate-180');
             }
         });
     };
 
-    const makeDropdown = (firstLink, secondLink, parentLabel, childLabels) => {
-        const parent = firstLink.parentElement;
+    const createGroup = (first, second, parentLabel, childLabels) => {
+        const parent = first?.parentElement;
 
-        if (!parent || parent !== secondLink.parentElement) {
+        if (!parent || parent !== second?.parentElement || !desktopContainer(parent)) {
             return;
         }
 
-        if (!looksLikeDesktopContainer(parent)) {
+        if (first.dataset.simolaGrouped === '1' || second.dataset.simolaGrouped === '1') {
             return;
         }
 
-        if (
-            firstLink.dataset.simolaGrouped === '1' ||
-            secondLink.dataset.simolaGrouped === '1'
-        ) {
-            return;
-        }
+        first.dataset.simolaGrouped = '1';
+        second.dataset.simolaGrouped = '1';
 
-        firstLink.dataset.simolaGrouped = '1';
-        secondLink.dataset.simolaGrouped = '1';
-
-        const firstActive = isCurrentLink(firstLink);
-        const secondActive = isCurrentLink(secondLink);
-        const active = firstActive || secondActive;
+        const active = isCurrent(first) || isCurrent(second);
 
         const wrapper = document.createElement('div');
         wrapper.className = 'relative flex self-stretch items-center';
-        wrapper.setAttribute('data-simola-nav-wrapper', '1');
+        wrapper.dataset.simolaNavWrapper = '1';
 
         const button = document.createElement('button');
         button.type = 'button';
-        button.setAttribute('data-simola-nav-button', '1');
+        button.dataset.simolaNavButton = '1';
+        button.setAttribute('aria-haspopup', 'menu');
         button.setAttribute('aria-expanded', 'false');
         button.className = [
             'inline-flex',
@@ -132,22 +109,17 @@ document.addEventListener('DOMContentLoaded', function () {
             'text-sm',
             'font-medium',
             'transition',
-            'focus:outline-none'
-        ].concat(
+            'focus:outline-none',
             active
-                ? ['border-indigo-500', 'text-slate-900']
-                : [
-                    'border-transparent',
-                    'text-slate-500',
-                    'hover:border-slate-300',
-                    'hover:text-slate-700'
-                ]
-        ).join(' ');
+                ? 'border-indigo-500 text-slate-900'
+                : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700'
+        ].join(' ');
 
         const label = document.createElement('span');
         label.textContent = parentLabel;
 
         const caret = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        caret.dataset.simolaNavCaret = '1';
         caret.setAttribute('viewBox', '0 0 20 20');
         caret.setAttribute('fill', 'currentColor');
         caret.setAttribute('aria-hidden', 'true');
@@ -155,33 +127,25 @@ document.addEventListener('DOMContentLoaded', function () {
         caret.innerHTML =
             '<path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.51a.75.75 0 01-1.08 0l-4.25-4.51a.75.75 0 01.02-1.06z" clip-rule="evenodd"></path>';
 
-        button.appendChild(label);
-        button.appendChild(caret);
+        button.append(label, caret);
 
         const menu = document.createElement('div');
-        menu.className =
-            'absolute left-0 top-full z-50 mt-1 hidden min-w-52 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg ring-1 ring-black/5';
-        menu.setAttribute('data-simola-nav-menu', '1');
+        menu.dataset.simolaNavMenu = '1';
+        menu.setAttribute('role', 'menu');
+        menu.className = 'hidden';
 
         [
-            [firstLink, childLabels[0]],
-            [secondLink, childLabels[1]]
-        ].forEach(([sourceLink, childLabel]) => {
+            [first, childLabels[0]],
+            [second, childLabels[1]]
+        ].forEach(([source, childLabel]) => {
             const item = document.createElement('a');
-            item.href = sourceLink.href;
+            item.href = source.href;
             item.textContent = childLabel;
-            item.className = [
-                'block',
-                'px-4',
-                'py-2.5',
-                'text-sm',
-                'font-medium',
-                'transition'
-            ].concat(
-                isCurrentLink(sourceLink)
-                    ? ['bg-indigo-50', 'text-indigo-700']
-                    : ['text-slate-700', 'hover:bg-slate-50', 'hover:text-slate-900']
-            ).join(' ');
+            item.setAttribute('role', 'menuitem');
+
+            if (isCurrent(source)) {
+                item.dataset.active = '1';
+            }
 
             menu.appendChild(item);
         });
@@ -192,45 +156,42 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const opening = menu.classList.contains('hidden');
 
-            closeAllDropdowns(wrapper);
+            close(wrapper);
 
-            if (opening) {
-                menu.classList.remove('hidden');
-                button.setAttribute('aria-expanded', 'true');
-                caret.classList.add('rotate-180');
-            } else {
-                menu.classList.add('hidden');
-                button.setAttribute('aria-expanded', 'false');
-                caret.classList.remove('rotate-180');
-            }
-        });
-
-        document.addEventListener('click', function (event) {
-            if (!wrapper.contains(event.target)) {
-                menu.classList.add('hidden');
-                button.setAttribute('aria-expanded', 'false');
-                caret.classList.remove('rotate-180');
-            }
+            menu.classList.toggle('hidden', !opening);
+            button.setAttribute('aria-expanded', opening ? 'true' : 'false');
+            caret.classList.toggle('rotate-180', opening);
         });
 
         wrapper.addEventListener('keydown', function (event) {
-            if (event.key === 'Escape') {
-                menu.classList.add('hidden');
-                button.setAttribute('aria-expanded', 'false');
-                caret.classList.remove('rotate-180');
-                button.focus();
+            if (event.key !== 'Escape') {
+                return;
             }
+
+            menu.classList.add('hidden');
+            button.setAttribute('aria-expanded', 'false');
+            caret.classList.remove('rotate-180');
+            button.focus();
         });
 
-        parent.insertBefore(wrapper, firstLink);
-        wrapper.appendChild(button);
-        wrapper.appendChild(menu);
+        document.addEventListener('click', function (event) {
+            if (wrapper.contains(event.target)) {
+                return;
+            }
 
-        firstLink.remove();
-        secondLink.remove();
+            menu.classList.add('hidden');
+            button.setAttribute('aria-expanded', 'false');
+            caret.classList.remove('rotate-180');
+        });
+
+        parent.insertBefore(wrapper, first);
+        wrapper.append(button, menu);
+
+        first.remove();
+        second.remove();
     };
 
-    const groups = [
+    [
         {
             first: 'Upload Terpadu',
             second: 'Riwayat Upload',
@@ -243,16 +204,16 @@ document.addEventListener('DOMContentLoaded', function () {
             parent: 'Crosscheck K3.2',
             children: ['Crosscheck K3.2', 'Laporan K3.2']
         }
-    ];
+    ].forEach((group) => {
+        find(group.first).forEach((first) => {
+            const second = find(group.second)
+                .find((candidate) => candidate.parentElement === first.parentElement);
 
-    groups.forEach((group) => {
-        const pairs = sameParentPairs(
-            findLinks(group.first),
-            findLinks(group.second)
-        );
+            if (!second) {
+                return;
+            }
 
-        pairs.forEach(([first, second]) => {
-            makeDropdown(
+            createGroup(
                 first,
                 second,
                 group.parent,

@@ -951,6 +951,8 @@ if (config('master-fleet.enabled')) {
                 ->name('grouping.operator-count.update');
         });
     }
+require __DIR__ . '/simola-help.php';
+require __DIR__ . '/operator-chat.php';
 require __DIR__ . '/auth.php';
 
 // SIMOLA ERRORLOG MONTHLY INSTALLER

@@ -9,7 +9,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
-use Smalot\PdfParser\Parser;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 class UploadTerpaduController extends Controller

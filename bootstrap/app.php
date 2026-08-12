@@ -3,6 +3,7 @@
 use App\Http\Middleware\EnsureMonitoringPermission;
 use App\Http\Middleware\AuditMasterFleetChanges;
 use App\Http\Middleware\EnsureUserIsActive;
+use App\Http\Middleware\EnsurePcOperatorPortal;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -29,6 +30,7 @@ return Application::configure(
                 'web',
                 [
                     EnsureUserIsActive::class,
+                    EnsurePcOperatorPortal::class,
                                     AuditMasterFleetChanges::class,
                 ]
             );

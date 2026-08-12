@@ -16,6 +16,7 @@ return [
         'developer' => 'Developer',
         'spv' => 'SPV',
         'lead' => 'Lead',
+        'pc_operator' => 'PC Operator',
     ],
 
     /*
@@ -245,6 +246,14 @@ return [
 
                 'users.access' =>
                     'Mengatur Hak Akses Pengguna',
+            ],
+        ],
+
+
+        'operator_chat' => [
+            'label' => 'Chat Operator PC',
+            'permissions' => [
+                'operator-chat.manage' => 'Melihat dan Membalas Chat Operator PC',
             ],
         ],
 

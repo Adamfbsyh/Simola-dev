@@ -1585,6 +1585,21 @@ class MasterFleetGoogleWorkspaceService
     /**
      * Membuat client OAuth siap pakai dan memperbarui token jika kedaluwarsa.
      */
+    /**
+     * Google Sheets client yang menggunakan koneksi OAuth K3-02 aktif.
+     *
+     * Token akan diperbarui otomatis oleh authorizedClient() bila kedaluwarsa.
+     */
+    public function sheetsForK302(
+        User $user
+    ): GoogleSheets {
+        return new GoogleSheets(
+            $this->authorizedClient(
+                $user,
+                FleetGoogleAccount::PURPOSE_K302
+            )
+        );
+    }
     private function authorizedClient(
         User $user,
         string $purpose
